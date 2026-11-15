@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}事件 · 职迹采{% endblock %}
+{% block content %}
+<h1>生命周期事件</h1>
+<p class="muted">展示最近 1000 条事件，按发生时间排序。</p>
+{% if events %}
+<table>
+  <thead><tr><th>类型</th><th>岗位</th><th>字段</th><th>旧值</th><th>新值</th><th>运行</th><th>时间</th></tr></thead>
+  <tbody>
+  {% for event in events %}
+    <tr><td>{{ event.event_type }}</td>
+      <td><a href="/jobs/{{ event.job_uid }}">{{ event.external_id }} {{ event.title }}</a></td>
+      <td>{{ event.field }}</td><td>{{ event.old_value or "∅" }}</td>
+      <td>{{ event.new_value or "∅" }}</td><td><code>{{ event.run_id }}</code></td>
+      <td class="muted">{{ event.created_at }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="muted">暂无事件。</p>{% endif %}
+{% endblock %}

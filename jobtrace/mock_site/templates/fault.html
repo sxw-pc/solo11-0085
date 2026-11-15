@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}注入故障 {{ status }}{% endblock %}
+{% block content %}
+<h1>注入故障 {{ status }}</h1>
+<p>{{ message }}</p>
+<p>这是场景 <code>{{ scenario }}</code> 的确定性瞬时故障，客户端重试后可能成功。</p>
+{% endblock %}

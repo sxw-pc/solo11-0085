@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}场景信息 · {{ info.scenario }}{% endblock %}
+{% block content %}
+<h1>当前场景：{{ info.scenario }}</h1>
+<p>{{ info.description }}</p>
+<dl>
+  <dt>岗位数量</dt><dd>{{ info.jobs }}</dd>
+  <dt>每页数量</dt><dd>{{ info.page_size }}</dd>
+  <dt>列表页数</dt><dd>{{ info.pages }}</dd>
+  <dt>可用场景</dt><dd>{{ info.available | join("、") }}</dd>
+</dl>
+<p>此页面只用于本地合成数据演示；场景切换通过 <code>POST /__control/scenario</code> 完成。</p>
+{% endblock %}

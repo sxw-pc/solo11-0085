@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}运行 · 职迹采{% endblock %}
+{% block content %}
+<h1>采集运行</h1>
+{% if runs %}
+<table>
+  <thead><tr><th>运行 ID</th><th>场景</th><th>状态</th><th>完整</th><th>页</th><th>卡片</th><th>详情失败</th><th>开始</th><th>结束</th></tr></thead>
+  <tbody>
+  {% for run in runs %}
+    <tr><td><code>{{ run.run_id }}</code></td><td>{{ run.scenario }}</td>
+      <td><span class="badge {{ run.status }}">{{ run.status }}</span></td>
+      <td>{{ "是" if run.is_complete else "否" }}</td><td>{{ run.pages_fetched }}</td>
+      <td>{{ run.list_cards }}</td><td>{{ run.details_failed }}</td>
+      <td class="muted">{{ run.started_at }}</td><td class="muted">{{ run.finished_at or "-" }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="muted">暂无运行。</p>{% endif %}
+{% endblock %}

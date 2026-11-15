@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "scenario": "pagination_loop",
+  "description": "列表页循环：末页的下一页链接指回第 2 页，用于验证循环保护。",
+  "extends": "baseline",
+  "listing": {
+    "page_size": 10,
+    "loop_last_to": 2
+  },
+  "faults": {
+    "detail_503": {},
+    "list_503": {}
+  }
+}

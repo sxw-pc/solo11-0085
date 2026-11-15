@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}总览 · 职迹采{% endblock %}
+{% block content %}
+<h1>岗位生命周期台账</h1>
+<p class="notice">只读视图。所有内容来自本地 SQLite 中的合成岗位数据。</p>
+<div class="grid">
+  <div class="stat"><strong>{{ counts.total }}</strong><span>台账岗位</span></div>
+  <div class="stat"><strong>{{ counts.open }}</strong><span>开放岗位</span></div>
+  <div class="stat"><strong>{{ counts.closed }}</strong><span>已关闭岗位</span></div>
+  <div class="stat"><strong>{{ events | length }}</strong><span>最近事件</span></div>
+</div>
+{% if latest %}
+<h2>最新运行</h2>
+<table>
+  <tr><th>运行 ID</th><td><code>{{ latest.run_id }}</code></td></tr>
+  <tr><th>场景</th><td>{{ latest.scenario }}</td></tr>
+  <tr><th>状态</th><td><span class="badge {{ latest.status }}">{{ latest.status }}</span>{% if latest.is_complete %} · 完整{% else %} · 不完整{% endif %}</td></tr>
+  <tr><th>时间</th><td>{{ latest.started_at }} → {{ latest.finished_at or "进行中" }}</td></tr>
+  <tr><th>规模</th><td>{{ latest.pages_fetched }} 页 · {{ latest.list_cards }} 卡片 · {{ latest.details_ok }} 详情成功 · {{ latest.details_failed }} 失败</td></tr>
+  <tr><th>配置指纹</th><td><code>{{ latest.config_hash[:16] }}…</code></td></tr>
+</table>
+{% if lifecycle.lifecycle %}
+<p class="muted">本次生命周期：新增 {{ lifecycle.lifecycle.new_jobs }}，字段变更 {{ lifecycle.lifecycle.changed_events }}，消失 {{ lifecycle.lifecycle.disappeared }}，关闭 {{ lifecycle.lifecycle.closed }}，重开 {{ lifecycle.lifecycle.reopened }}。</p>
+{% endif %}
+{% else %}
+<p>尚无采集运行记录。先执行 <code>make demo</code> 或 <code>make collect</code>。</p>
+{% endif %}
+
+<h2>最近事件</h2>
+{% if events %}
+<table>
+  <thead><tr><th>类型</th><th>岗位</th><th>字段</th><th>变化</th><th>时间</th></tr></thead>
+  <tbody>
+  {% for event in events %}
+    <tr><td>{{ event.event_type }}</td>
+      <td><a href="/jobs/{{ event.job_uid }}">{{ event.external_id }} {{ event.title }}</a></td>
+      <td>{{ event.field }}</td><td>{{ event.old_value or "∅" }} → {{ event.new_value or "∅" }}</td>
+      <td class="muted">{{ event.created_at }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="muted">暂无事件。</p>{% endif %}
+
+<h2>岗位台账</h2>
+<table>
+  <thead><tr><th>编号</th><th>标题</th><th>公司</th><th>城市</th><th>薪资</th><th>状态</th><th>最近出现</th></tr></thead>
+  <tbody>
+  {% for job in jobs %}
+    <tr><td><a href="/jobs/{{ job.job_uid }}">{{ job.external_id }}</a></td>
+      <td>{{ job.title }}</td><td>{{ job.company }}</td><td>{{ job.city or "" }}</td>
+      <td>{{ job.salary_text }}</td>
+      <td><span class="badge {{ job.status }}">{{ job.status }}</span></td>
+      <td class="muted">{{ job.last_seen_at }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

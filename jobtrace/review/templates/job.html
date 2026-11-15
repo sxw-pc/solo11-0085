@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}{{ job.external_id }} · 岗位复核{% endblock %}
+{% block content %}
+<p><a href="/">← 返回总览</a></p>
+<h1>{{ job.title }}</h1>
+<p><span class="badge {{ job.status }}">{{ job.status }}</span>
+  {% if job.missing_streak %} · 连续缺失 {{ job.missing_streak }} 次{% endif %}
+  {% if job.reopen_count %} · 重开 {{ job.reopen_count }} 次{% endif %}</p>
+<table>
+  <tr><th>岗位编号</th><td><code>{{ job.external_id }}</code></td></tr>
+  <tr><th>公司</th><td>{{ job.company }}</td></tr>
+  <tr><th>地点</th><td>{{ job.location_raw }}（{{ job.city or "未知" }} / {{ job.district or "-" }}）</td></tr>
+  <tr><th>薪资</th><td>{{ job.salary_text }}{% if job.salary_negotiable %} · 面议{% endif %}</td></tr>
+  <tr><th>经验</th><td>{{ job.experience_text or "未知" }}</td></tr>
+  <tr><th>类型</th><td>{{ job.employment_type or "未知" }}</td></tr>
+  <tr><th>发布</th><td>{{ job.posted_at or "未知" }} · 来源状态 {{ job.source_status or "未知" }}</td></tr>
+  <tr><th>首次出现</th><td>{{ job.first_seen_at }} · {{ job.first_seen_run_id }}</td></tr>
+  <tr><th>最近出现</th><td>{{ job.last_seen_at }} · {{ job.last_seen_run_id }}</td></tr>
+  <tr><th>关闭时间</th><td>{{ job.closed_at or "-" }}</td></tr>
+  <tr><th>内容哈希</th><td><code>{{ job.content_hash }}</code></td></tr>
+  <tr><th>原始链接</th><td><code>{{ job.detail_url }}</code></td></tr>
+</table>
+
+<h2>标签</h2>
+<ul class="tags">{% for tag in job.tags %}<li>{{ tag }}</li>{% endfor %}</ul>
+
+<h2>描述</h2>
+<p>{{ job.description }}</p>
+
+<h2>事件时间线</h2>
+{% if events %}
+<table>
+  <thead><tr><th>类型</th><th>字段</th><th>旧值</th><th>新值</th><th>运行</th><th>时间</th></tr></thead>
+  <tbody>
+  {% for event in events %}
+    <tr><td>{{ event.event_type }}</td><td>{{ event.field }}</td><td>{{ event.old_value or "∅" }}</td><td>{{ event.new_value or "∅" }}</td><td><code>{{ event.run_id }}</code></td><td>{{ event.created_at }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="muted">暂无事件。</p>{% endif %}
+
+<h2>快照</h2>
+{% if snapshots %}
+<table>
+  <thead><tr><th>运行</th><th>内容哈希</th><th>观测时间</th></tr></thead>
+  <tbody>{% for snapshot in snapshots %}<tr><td><code>{{ snapshot.run_id }}</code></td><td><code>{{ snapshot.content_hash[:16] }}…</code></td><td>{{ snapshot.observed_at }}</td></tr>{% endfor %}</tbody>
+</table>
+{% else %}<p class="muted">暂无快照。</p>{% endif %}
+{% endblock %}

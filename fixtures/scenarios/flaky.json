@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "scenario": "flaky",
+  "description": "瞬时故障：部分列表页/详情页首次返回 503，客户端有限重试后应成功。",
+  "extends": "baseline",
+  "faults": {
+    "detail_503": {
+      "JT-0007": 2,
+      "JT-0033": 1
+    },
+    "list_503": {
+      "2": 1,
+      "5": 1
+    }
+  }
+}

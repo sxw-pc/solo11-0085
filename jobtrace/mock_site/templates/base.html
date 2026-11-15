@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}合成招聘站点{% endblock %}</title>
+  <style>
+    :root { color-scheme: light; --ink:#17212b; --muted:#61707d; --line:#dce3e8; --accent:#0f6b5c; --bg:#f5f7f6; }
+    * { box-sizing: border-box; }
+    body { margin:0; font:15px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--ink); background:var(--bg); }
+    header { background:#fff; border-bottom:1px solid var(--line); }
+    .wrap { max-width:960px; margin:0 auto; padding:20px; }
+    header .wrap { display:flex; justify-content:space-between; align-items:center; gap:16px; }
+    .brand { font-weight:700; letter-spacing:.02em; color:var(--accent); text-decoration:none; }
+    nav a { color:var(--muted); margin-left:14px; text-decoration:none; }
+    h1 { font-size:1.7rem; margin:.4rem 0 1rem; }
+    .notice { background:#fff7df; border:1px solid #ecd899; padding:10px 14px; border-radius:8px; }
+    .job-list { list-style:none; padding:0; display:grid; gap:12px; }
+    .job-card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:16px; }
+    .job-card .meta { color:var(--muted); display:flex; flex-wrap:wrap; gap:6px 18px; margin-top:8px; }
+    .job-title { font-weight:650; font-size:1.05rem; }
+    .salary { color:#a14d20; font-weight:600; }
+    a.job-link { color:inherit; text-decoration:none; }
+    .pager { display:flex; justify-content:space-between; margin:22px 0; }
+    .pager a { color:var(--accent); }
+    .tags { display:flex; flex-wrap:wrap; gap:6px; padding:0; list-style:none; }
+    .tags li { background:#e8f3ef; border-radius:999px; padding:2px 10px; font-size:.85rem; }
+    dl { display:grid; grid-template-columns:130px 1fr; gap:8px 14px; background:#fff; padding:18px; border:1px solid var(--line); border-radius:10px; }
+    dt { color:var(--muted); }
+    dd { margin:0; }
+    code { background:#eef2f1; padding:1px 5px; border-radius:4px; }
+  </style>
+</head>
+<body>
+  <header><div class="wrap">
+    <a class="brand" href="/jobs?page=1">职迹采 · 合成招聘站点</a>
+    <nav><a href="/scenario">场景信息</a><a href="/healthz">健康检查</a></nav>
+  </div></header>
+  <main class="wrap">
+    <p class="notice">离线测试数据：所有岗位、公司、地点与描述均为虚构，不包含联系方式或真实个人信息。</p>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

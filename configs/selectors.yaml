@@ -1,0 +1,21 @@
+list:
+  item: "li.job-card"
+  link: "a.job-link"
+  job_id_attr: "data-job-id"
+  title: "span.job-title"
+  company: "span.job-company"
+  location: "span.job-location"
+  salary: "span.job-salary"
+  next_page: "a.next-page"
+
+detail:
+  title: "h1.job-title"
+  company: ".company-name"
+  location: ".job-location"
+  salary: ".job-salary"
+  experience: ".job-experience"
+  employment_type: ".job-type"
+  description: ".job-description"
+  posted_at: ".job-posted-at"
+  status: ".job-status"
+  tags: ".tag"

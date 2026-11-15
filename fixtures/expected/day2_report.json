@@ -1,0 +1,71 @@
+{
+  "report": {
+    "generated_at": "2026-01-16T09:00:00Z",
+    "jobs_total": 66,
+    "jobs_open": 66,
+    "jobs_closed": 0,
+    "latest_run_id": "run-2",
+    "latest_status": "complete",
+    "event_counts": {
+      "NEW": 2,
+      "CHANGED": 3,
+      "DISAPPEARED": 2,
+      "CLOSED": 0,
+      "REOPENED": 0
+    },
+    "raw_documents_in_latest_run": 71,
+    "csv_rows": 66,
+    "jsonl_rows": 7
+  },
+  "events": [
+    {
+      "event_type": "CHANGED",
+      "external_id": "JT-0005",
+      "field": "salary",
+      "old_value": "15000-25000元/月·13薪",
+      "new_value": "25000-35000元/月·14薪"
+    },
+    {
+      "event_type": "CHANGED",
+      "external_id": "JT-0008",
+      "field": "title",
+      "old_value": "资深算法工程师",
+      "new_value": "资深前端开发工程师"
+    },
+    {
+      "event_type": "CHANGED",
+      "external_id": "JT-0010",
+      "field": "location",
+      "old_value": "南京 · 建邺区",
+      "new_value": "北京 · 海淀区"
+    },
+    {
+      "event_type": "NEW",
+      "external_id": "JT-0065",
+      "field": "job",
+      "old_value": null,
+      "new_value": "数据平台工程师"
+    },
+    {
+      "event_type": "NEW",
+      "external_id": "JT-0066",
+      "field": "job",
+      "old_value": null,
+      "new_value": "用户运营专员"
+    },
+    {
+      "event_type": "DISAPPEARED",
+      "external_id": "JT-0003",
+      "field": "presence",
+      "old_value": "seen",
+      "new_value": "missing_1"
+    },
+    {
+      "event_type": "DISAPPEARED",
+      "external_id": "JT-0017",
+      "field": "presence",
+      "old_value": "seen",
+      "new_value": "missing_1"
+    }
+  ]
+}

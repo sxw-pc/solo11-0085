@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "scenario": "day2",
+  "description": "第二日增量：新增 2 条、移除 2 条、3 处字段变更，并含 1 张重复 ID 卡片。",
+  "extends": "baseline",
+  "remove_ids": [
+    "JT-0003",
+    "JT-0017"
+  ],
+  "changes": {
+    "JT-0005": {
+      "salary": "25-35K·14薪"
+    },
+    "JT-0008": {
+      "title": "资深前端开发工程师"
+    },
+    "JT-0010": {
+      "location": "北京 · 海淀区"
+    }
+  },
+  "add": [
+    {
+      "id": "JT-0065",
+      "title": "数据平台工程师",
+      "company": "星砂科技（虚构）",
+      "location": "杭州 · 西湖区",
+      "salary": "25-35K·14薪",
+      "experience": "3-5年",
+      "employment_type": "全职",
+      "posted_at": "2026-01-10",
+      "description": "负责离线数据平台建设与合成数据质量校验，岗位信息完全虚构。",
+      "tags": [
+        "Python",
+        "数据平台",
+        "质量校验"
+      ]
+    },
+    {
+      "id": "JT-0066",
+      "title": "用户运营专员",
+      "company": "微澜传媒（虚构）",
+      "location": "成都 · 高新区",
+      "salary": "9-13K·13薪",
+      "experience": "1-3年",
+      "employment_type": "全职",
+      "posted_at": "2026-01-11",
+      "description": "负责虚构社区的用户运营与活动复盘，不涉及任何真实联系人。",
+      "tags": [
+        "运营",
+        "活动",
+        "复盘"
+      ]
+    }
+  ],
+  "listing": {
+    "page_size": 10,
+    "duplicate_ids": [
+      "JT-0065"
+    ]
+  },
+  "faults": {
+    "detail_503": {},
+    "list_503": {}
+  }
+}

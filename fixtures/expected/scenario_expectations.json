@@ -1,0 +1,30 @@
+{
+  "baseline": {
+    "jobs_total": 64,
+    "new_jobs": 64,
+    "list_cards": 64,
+    "pages": 7,
+    "complete": true
+  },
+  "day2": {
+    "jobs_total": 66,
+    "new_jobs": 2,
+    "changed_events": 3,
+    "disappeared": 2,
+    "duplicate_ids": 1,
+    "complete": true
+  },
+  "malformed": {
+    "details_failed": 3,
+    "complete": false,
+    "unknown_detail_ids": 2
+  },
+  "pagination_loop": {
+    "complete": false,
+    "stop_reason": "pagination_loop"
+  },
+  "flaky": {
+    "complete": true,
+    "retries": 5
+  }
+}

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ job.title }} · 合成岗位{% endblock %}
+{% block content %}
+<p><a href="/jobs?page=1">← 返回列表</a></p>
+<h1 class="job-title">{{ job.title }}</h1>
+<dl>
+  {% if "company" not in omitted %}<dt>公司</dt><dd class="company-name">{{ job.company }}</dd>{% endif %}
+  {% if "location" not in omitted %}<dt>地点</dt><dd class="job-location">{{ job.location }}</dd>{% endif %}
+  {% if "salary" not in omitted %}<dt>薪资</dt><dd class="job-salary">{{ job.salary }}</dd>{% endif %}
+  {% if "experience" not in omitted %}<dt>经验</dt><dd class="job-experience">{{ job.experience }}</dd>{% endif %}
+  {% if "employment_type" not in omitted %}<dt>类型</dt><dd class="job-type">{{ job.employment_type }}</dd>{% endif %}
+  <dt>发布日期</dt><dd class="job-posted-at">{{ job.posted_at }}</dd>
+  <dt>状态</dt><dd class="job-status">招聘中</dd>
+</dl>
+<h2>岗位描述</h2>
+<p class="job-description">{{ job.description }}</p>
+<h2>标签</h2>
+<ul class="tags">
+  {% if "tags" not in omitted %}
+  {% for tag in job.tags %}<li class="tag">{{ tag }}</li>{% endfor %}
+  {% endif %}
+</ul>
+<p><small>岗位编号：<code>{{ job.id }}</code> · 合成数据，仅用于离线评测。</small></p>
+{% endblock %}

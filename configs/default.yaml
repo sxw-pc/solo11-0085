@@ -1,0 +1,34 @@
+site:
+  name: jobtrace-demo
+  base_url: "http://127.0.0.1:8765"
+  list_path: "/jobs"
+  page_param: "page"
+  page_size: 10
+  max_pages: 20
+  max_details: 200
+  allowed_hosts:
+    - "127.0.0.1"
+  allowed_ports:
+    - 8765
+  scenario: "baseline"
+
+crawl:
+  connect_timeout_seconds: 2.0
+  read_timeout_seconds: 3.0
+  max_retries: 2
+  retry_backoff_seconds: 0.05
+  max_response_bytes: 1048576
+  request_interval_seconds: 0.0
+  user_agent: "jobtrace-offline-eval/1.0"
+
+storage:
+  database: "var/jobtrace.sqlite3"
+  raw_dir: "var/raw"
+  report_dir: "var/reports"
+  checkpoint: "var/checkpoint.json"
+
+lifecycle:
+  close_after_missing_runs: 2
+
+clock:
+  fixed_at: null

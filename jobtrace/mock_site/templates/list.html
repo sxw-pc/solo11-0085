@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}岗位列表 · 第 {{ page }} 页{% endblock %}
+{% block content %}
+<h1>公开岗位列表</h1>
+<p>场景 <code>{{ scenario }}</code> · 第 {{ page }} / {{ pages }} 页 · 共 {{ total_jobs }} 条合成岗位</p>
+<ul class="job-list">
+  {% for job in jobs %}
+  <li class="job-card" data-job-id="{{ job.id }}">
+    <a class="job-link" href="/jobs/{{ job.id }}">
+      {% if not job.malformed or loop.index0 % 2 == 0 %}
+      <span class="job-title">{{ job.title }}</span>
+      {% endif %}
+    </a>
+    {% if not job.malformed or loop.index0 % 2 == 0 %}
+    <div class="meta"><span class="job-company">{{ job.company }}</span>
+      <span class="job-location">{{ job.location }}</span>
+      <span class="job-salary">{{ job.salary }}</span>
+      <span>{{ job.experience }}</span><span>{{ job.employment_type }}</span></div>
+    {% else %}
+    <div class="meta"><span class="job-location">{{ job.location }}</span></div>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+<div class="pager">
+  <span>{% if page > 1 %}<a href="/jobs?page={{ page - 1 }}">上一页</a>{% endif %}</span>
+  <span>{% if next_url %}<a class="next-page" rel="next" href="{{ next_url }}">下一页</a>{% endif %}</span>
+</div>
+{% endblock %}

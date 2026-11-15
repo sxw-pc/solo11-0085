@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "scenario": "malformed",
+  "description": "结构异常：2 个详情缺失、1 张畸形卡片、1 个必填字段缺失、若干可选字段缺失。",
+  "extends": "baseline",
+  "listing": {
+    "page_size": 10,
+    "missing_detail_ids": [
+      "JT-0012",
+      "JT-0031"
+    ],
+    "malformed_card_ids": [
+      "JT-0040"
+    ]
+  },
+  "omit_fields": {
+    "JT-0019": [
+      "salary",
+      "location"
+    ],
+    "JT-0022": [
+      "company"
+    ],
+    "JT-0040": [
+      "salary"
+    ]
+  },
+  "faults": {
+    "detail_503": {},
+    "list_503": {}
+  }
+}
