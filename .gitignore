@@ -6,3 +6,9 @@ var/
 *.egg-info/
 .coverage
 htmlcov/
+venv/
+node_modules/
+*.pyc
+.benchmarks/
+.env
+dist/
