@@ -52,5 +52,9 @@ class StorageError(JobTraceError):
     code = "storage_error"
 
 
+class CorrectionError(JobTraceError):
+    code = "correction_error"
+
+
 class RawStoreError(JobTraceError):
     code = "rawstore_error"

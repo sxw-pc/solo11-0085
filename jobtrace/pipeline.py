@@ -55,6 +55,7 @@ def run_collection(
     resume: bool = False,
     clock: Clock | None = None,
     sleep: Any = None,
+    business_date: str | None = None,
 ) -> CollectionOutcome:
     config = loaded.config
     selected_scenario = scenario or config.site.scenario
@@ -70,7 +71,8 @@ def run_collection(
     try:
         store.begin_run(run_id=identifier, site_key=config.site.name,
                         scenario=selected_scenario, base_url=config.site.base_url,
-                        config_hash=loaded.fingerprint, started_at=started_at, resumed=resume)
+                        config_hash=loaded.fingerprint, started_at=started_at,
+                        resumed=resume, business_date=business_date or started_at[:10])
         crawler = Crawler(loaded, client, raw_store, active_clock)
         try:
             result = crawler.crawl(identifier, resume=resume)

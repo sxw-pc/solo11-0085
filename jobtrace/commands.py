@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 from .clock import clock_from_config
 from .config import DEFAULT_CONFIG, DEFAULT_SELECTORS, LoadedConfig, load_config
 from .errors import ConfigError
-from .lint_size import check
+from .lint_size import MAX_TOTAL_LINES, MIN_TOTAL_LINES, check
 from .mock_site import FIXTURES_DIR, create_app as create_mock_app
 from .pipeline import run_collection
 from .report import write_reports
@@ -197,7 +197,10 @@ def command_lint_size(args: Namespace) -> int:
         for name, lines in sorted(report.oversized.items()):
             print(f"  {lines:4d}  {name}")
         return 1
-    if not 2500 <= report.total <= 4500:
-        print("Total code line count is outside the required 2500-4500 range.")
+    if not report.ok:
+        print(
+            f"Total code line count is outside the required "
+            f"{MIN_TOTAL_LINES}-{MAX_TOTAL_LINES} range."
+        )
         return 1
     return 0

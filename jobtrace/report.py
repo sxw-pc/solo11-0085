@@ -85,6 +85,20 @@ def _event_payload(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _correction_payload(row: dict[str, Any]) -> dict[str, Any]:
+    try:
+        diff = json.loads(row.get("diff_json") or "{}")
+    except (TypeError, json.JSONDecodeError):
+        diff = {}
+    return {
+        "correction_id": row["correction_id"], "mode": row["mode"],
+        "status": row["status"], "business_date": row["business_date"],
+        "corrected_run_id": row["corrected_run_id"], "run_id": row["run_id"],
+        "source_summary": row["source_summary"], "semantics": row["semantics"],
+        "diff": diff, "created_at": _timestamp(row["created_at"]),
+    }
+
+
 def build_report(store: Store, clock: Clock, site_key: str | None = None) -> dict[str, Any]:
     latest = store.latest_run(site_key)
     selected_site = site_key or (latest["site_key"] if latest else "")
@@ -115,10 +129,13 @@ def build_report(store: Store, clock: Clock, site_key: str | None = None) -> dic
              for key in ("lifecycle", "failures", "warnings", "selector_misses")}
         )
     raw_count = len(store.raw_documents_for_run(latest["run_id"])) if latest else 0
+    corrections = [_correction_payload(row) for row in store.list_corrections(selected_site)]
+    summary["corrections"] = len(corrections)
     return {
         "schema_version": 1, "generated_at": iso_z(clock.now()),
         "site_key": selected_site, "summary": summary,
         "latest_run": latest_payload, "runs": runs, "jobs": jobs, "events": events,
+        "corrections": corrections,
         "raw_evidence": {"documents_in_latest_run": raw_count},
     }
 
@@ -170,6 +187,21 @@ def render_markdown(report: dict[str, Any]) -> str:
             job["first_seen_at"], job["last_seen_at"],
         )
         lines.append("| {} | {} | {} | {} | {} | {} | {} | {} |".format(*values))
+    lines.extend(["", "## 历史更正", ""])
+    if report["corrections"]:
+        lines.extend([
+            "| 更正批次 | 语义 | 业务日期 | 被更正运行 | 状态 | 来源摘要 |",
+            "| --- | --- | --- | --- | --- | --- |",
+        ])
+        for correction in report["corrections"]:
+            values = (
+                correction["correction_id"], correction["mode"],
+                correction["business_date"], correction["corrected_run_id"],
+                correction["status"], _cell(correction["source_summary"]),
+            )
+            lines.append("| {} | {} | {} | {} | {} | {} |".format(*values))
+    else:
+        lines.append("没有历史更正记录。")
     lines.extend([
         "", "## 证据与诊断", "",
         f"- 原始响应文档数：{report['raw_evidence']['documents_in_latest_run']}",

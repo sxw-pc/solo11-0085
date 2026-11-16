@@ -39,12 +39,20 @@ class Store:
             try:
                 self.conn.execute("PRAGMA journal_mode = WAL")
                 self.conn.executescript(SCHEMA)
+                self._migrate()
                 self.conn.execute(
                     "INSERT OR REPLACE INTO meta(key, value) VALUES('schema_version', ?)",
                     (SCHEMA_VERSION,),
                 )
             except sqlite3.Error as exc:
                 raise StorageError(f"cannot initialize database: {exc}") from exc
+
+    def _migrate(self) -> None:
+        columns = {row[1] for row in self.conn.execute("PRAGMA table_info(runs)")}
+        if "business_date" not in columns:
+            self.conn.execute(
+                "ALTER TABLE runs ADD COLUMN business_date TEXT NOT NULL DEFAULT ''"
+            )
 
     def close(self) -> None:
         self.conn.close()
@@ -68,13 +76,16 @@ class Store:
             raise
 
     def begin_run(self, *, run_id: str, site_key: str, scenario: str, base_url: str,
-                  config_hash: str, started_at: str, resumed: bool = False) -> bool:
+                  config_hash: str, started_at: str, resumed: bool = False,
+                  business_date: str = "") -> bool:
         with self.transaction() as conn:
             cursor = conn.execute(
                 """INSERT OR IGNORE INTO runs(
-                    run_id, site_key, scenario, base_url, config_hash, started_at, resumed
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (run_id, site_key, scenario, base_url, config_hash, started_at, int(resumed)),
+                    run_id, site_key, scenario, base_url, config_hash, started_at,
+                    business_date, resumed
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (run_id, site_key, scenario, base_url, config_hash, started_at,
+                 business_date, int(resumed)),
             )
             return cursor.rowcount == 1
 
@@ -134,6 +145,40 @@ class Store:
         if site_key:
             sql, params = sql + " WHERE site_key = ?", [site_key]
         rows = self.conn.execute(sql + " ORDER BY started_at DESC, rowid DESC LIMIT ?", (*params, limit))
+        return [dict(row) for row in rows]
+
+    def timeline_runs(self, site_key: str) -> list[dict[str, Any]]:
+        """Lifecycle-applied runs in business-time order with corrections resolved."""
+        rows = self.conn.execute(
+            """SELECT * FROM runs WHERE site_key = ? AND status IN ('complete', 'incomplete')
+            AND run_id NOT IN (SELECT run_id FROM corrections WHERE mode = 'archive')
+            AND run_id NOT IN (
+                SELECT corrected_run_id FROM corrections WHERE mode = 'recompute')
+            ORDER BY business_date, started_at, rowid""",
+            (site_key,),
+        )
+        return [dict(row) for row in rows]
+
+    def run_observations(self, run_id: str) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            """SELECT j.external_id, s.content_hash, s.payload_json
+            FROM job_snapshots s JOIN jobs j ON j.job_uid = s.job_uid
+            WHERE s.run_id = ? ORDER BY j.external_id""",
+            (run_id,),
+        )
+        return [dict(row) for row in rows]
+
+    def get_correction(self, correction_id: str) -> dict[str, Any] | None:
+        row = self.conn.execute(
+            "SELECT * FROM corrections WHERE correction_id = ?", (correction_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+    def list_corrections(self, site_key: str | None = None) -> list[dict[str, Any]]:
+        sql, params = "SELECT * FROM corrections", ()
+        if site_key:
+            sql, params = sql + " WHERE site_key = ?", (site_key,)
+        rows = self.conn.execute(sql + " ORDER BY created_at, rowid", params)
         return [dict(row) for row in rows]
 
     def get_job(self, job_uid: str) -> dict[str, Any] | None:

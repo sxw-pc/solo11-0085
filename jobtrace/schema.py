@@ -1,6 +1,6 @@
 """SQLite schema for runs, jobs, snapshots, events, and raw evidence."""
 
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (
@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS runs (
     run_id TEXT PRIMARY KEY, site_key TEXT NOT NULL, scenario TEXT NOT NULL,
     base_url TEXT NOT NULL, config_hash TEXT NOT NULL,
     started_at TEXT NOT NULL, finished_at TEXT,
+    business_date TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT 'running', is_complete INTEGER NOT NULL DEFAULT 0,
     pages_fetched INTEGER NOT NULL DEFAULT 0, list_cards INTEGER NOT NULL DEFAULT 0,
     unique_jobs INTEGER NOT NULL DEFAULT 0, details_ok INTEGER NOT NULL DEFAULT 0,
@@ -61,6 +62,26 @@ CREATE TABLE IF NOT EXISTS events (
 
 CREATE INDEX IF NOT EXISTS idx_events_run ON events(run_id, id);
 CREATE INDEX IF NOT EXISTS idx_events_job ON events(job_uid, id);
+
+CREATE TABLE IF NOT EXISTS corrections (
+    correction_id TEXT PRIMARY KEY, site_key TEXT NOT NULL,
+    run_id TEXT NOT NULL, corrected_run_id TEXT NOT NULL,
+    business_date TEXT NOT NULL, mode TEXT NOT NULL,
+    source_summary TEXT NOT NULL, fingerprint TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'applied', semantics TEXT NOT NULL DEFAULT '',
+    diff_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_corrections_site ON corrections(site_key, business_date);
+
+CREATE TABLE IF NOT EXISTS derived_archive (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, correction_id TEXT NOT NULL,
+    kind TEXT NOT NULL, ref TEXT NOT NULL,
+    payload_json TEXT NOT NULL, archived_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_derived_archive_correction
+    ON derived_archive(correction_id, kind);
 
 CREATE TABLE IF NOT EXISTS raw_documents (
     sha256 TEXT PRIMARY KEY, size_bytes INTEGER NOT NULL,
