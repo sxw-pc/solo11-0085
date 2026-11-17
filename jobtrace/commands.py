@@ -8,12 +8,14 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from .clock import clock_from_config
+from .concentration import analyze_run
 from .config import DEFAULT_CONFIG, DEFAULT_SELECTORS, LoadedConfig, load_config
+from .employers import load_registry
 from .errors import ConfigError
-from .lint_size import check
+from .lint_size import MAX_TOTAL_LINES, MIN_TOTAL_LINES, check
 from .mock_site import FIXTURES_DIR, create_app as create_mock_app
 from .pipeline import run_collection
-from .report import write_reports
+from .report import write_concentration_files, write_reports
 from .review import create_app as create_review_app
 from .serving import RunningServer, start_server, wait_forever
 from .store import Store
@@ -137,6 +139,27 @@ def command_report(args: Namespace) -> int:
     return 0
 
 
+def command_concentration(args: Namespace) -> int:
+    overrides = {"storage.report_dir": args.out} if args.out else {}
+    loaded = _load(args, overrides)
+    registry = load_registry(args.registry)
+    clock = clock_from_config(loaded.config.clock.fixed_at)
+    store = Store(loaded.config.storage.database, readonly=True)
+    try:
+        result = analyze_run(store, args.run_id, registry, now=clock.now())
+        paths = write_concentration_files(result, loaded.config.storage.report_dir)
+    finally:
+        store.close()
+    print(f"Run: {args.run_id} status={result['status']}")
+    for contract in result["contracts"].values():
+        hhi = contract["hhi"]
+        bounds = f"[{hhi['min']}, {hhi['max']}]" if hhi else "n/a"
+        print(f"{contract['label']}: HHI {bounds} denominator={contract['denominator']}")
+    print(f"Report: {paths['markdown']}")
+    print(f"JSON: {paths['json']}")
+    return 0
+
+
 def command_demo(args: Namespace) -> int:
     scenario = args.scenario
     mock, base_url = _mock_server(scenario, args.port, args.fixtures_dir)
@@ -197,7 +220,8 @@ def command_lint_size(args: Namespace) -> int:
         for name, lines in sorted(report.oversized.items()):
             print(f"  {lines:4d}  {name}")
         return 1
-    if not 2500 <= report.total <= 4500:
-        print("Total code line count is outside the required 2500-4500 range.")
+    if not MIN_TOTAL_LINES <= report.total <= MAX_TOTAL_LINES:
+        print(f"Total code line count is outside the required "
+              f"{MIN_TOTAL_LINES}-{MAX_TOTAL_LINES} range.")
         return 1
     return 0

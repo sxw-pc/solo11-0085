@@ -1,0 +1,55 @@
+# 受控合成雇主注册表：仅用于本地演示的虚构雇主解析规则。
+# 展示名 -> 法律雇主（按有效日期），外加互斥别名关系与管理集团隶属。
+registry_version: "2026.1"
+
+groups:
+  - id: GRP-XINGCHEN
+    name: 星辰控股集团（虚构）
+  - id: GRP-MUMIAN
+    name: 木棉集团（虚构）
+
+employers:
+  - id: EMP-SHILI
+    legal_name: 示例公司甲有限公司（虚构）
+  - id: EMP-XINGSHA
+    legal_name: 星砂科技有限公司（虚构）
+    group: GRP-XINGCHEN
+  - id: EMP-QINGHE
+    legal_name: 青禾数据有限公司（虚构）
+    group: GRP-XINGCHEN
+  - id: EMP-YUANFAN
+    legal_name: 远帆软件有限公司（虚构）
+  - id: EMP-SHIGUANG
+    legal_name: 拾光网络有限公司（虚构）
+  - id: EMP-BEICHEN
+    legal_name: 北辰智造有限公司（虚构）
+  - id: EMP-MUMIAN
+    legal_name: 木棉咨询有限公司（虚构）
+    group: GRP-MUMIAN
+  - id: EMP-YUNTI
+    legal_name: 云梯教育有限公司（虚构）
+  - id: EMP-LANTU
+    legal_name: 岚图医疗有限公司（虚构）
+  - id: EMP-WEILAN
+    legal_name: 微澜传媒有限公司（虚构）
+    group: GRP-MUMIAN
+
+aliases:
+  - {display: 示例公司甲（虚构）, employer: EMP-SHILI, valid_from: "2025-01-01", valid_to: "2026-12-31"}
+  - {display: 星砂科技（虚构）, employer: EMP-XINGSHA, valid_from: "2025-01-01", valid_to: "2026-12-31"}
+  - {display: 远帆软件（虚构）, employer: EMP-YUANFAN, valid_from: "2025-01-01", valid_to: "2026-12-31"}
+  - {display: 拾光网络（虚构）, employer: EMP-SHIGUANG, valid_from: "2025-01-01", valid_to: "2026-12-31"}
+  - {display: 北辰智造（虚构）, employer: EMP-BEICHEN, valid_from: "2025-01-01", valid_to: "2026-12-31"}
+  - {display: 木棉咨询（虚构）, employer: EMP-MUMIAN, valid_from: "2025-01-01", valid_to: "2026-12-31"}
+  - {display: 云梯教育（虚构）, employer: EMP-YUNTI, valid_from: "2025-01-01", valid_to: "2026-12-31"}
+  - {display: 岚图医疗（虚构）, employer: EMP-LANTU, valid_from: "2025-01-01", valid_to: "2026-12-31"}
+  - {display: 微澜传媒（虚构）, employer: EMP-WEILAN, valid_from: "2025-01-01", valid_to: "2026-12-31"}
+  # 简称/改名：不同展示名仍可指同一法律雇主。
+  - {display: 星砂科技, employer: EMP-XINGSHA, valid_from: "2025-01-01", valid_to: "2026-12-31"}
+  # 同名不同日期指不同实体：2025 年的「青禾数据（虚构）」是示例公司甲的旧品牌。
+  - {display: 青禾数据（虚构）, employer: EMP-SHILI, valid_from: "2025-01-01", valid_to: "2025-12-31"}
+  - {display: 青禾数据（虚构）, employer: EMP-QINGHE, valid_from: "2026-01-01", valid_to: "2026-12-31"}
+
+mutex:
+  # 受控互斥：这两个展示名在同一 run 内不得解析为同一法律雇主。
+  - [远帆软件（虚构）, 拾光网络（虚构）]

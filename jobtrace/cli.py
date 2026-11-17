@@ -10,13 +10,14 @@ from typing import Callable
 from . import __version__
 from .commands import (
     command_collect,
+    command_concentration,
     command_demo,
     command_lint_size,
     command_report,
     command_serve_mock,
     command_serve_review,
 )
-from .config import DEFAULT_CONFIG, DEFAULT_SELECTORS
+from .config import DEFAULT_CONFIG, DEFAULT_EMPLOYERS, DEFAULT_SELECTORS
 from .errors import JobTraceError
 from .mock_site import FIXTURES_DIR
 
@@ -78,6 +79,16 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("--site", help="site key to report")
     report.add_argument("--clock", help="fixed ISO-8601 clock, or 'system'")
 
+    concentration = commands.add_parser(
+        "concentration", help="employer concentration audit for one complete run")
+    _config_options(concentration)
+    concentration.add_argument("--db", help="SQLite database path override")
+    concentration.add_argument("--out", help="report output directory override")
+    concentration.add_argument("--clock", help="fixed ISO-8601 clock, or 'system'")
+    concentration.add_argument("--run-id", required=True, help="complete run to analyze")
+    concentration.add_argument("--registry", default=str(DEFAULT_EMPLOYERS),
+                               help="synthetic employer registry YAML path")
+
     serve_mock = commands.add_parser("serve-mock", help="serve the synthetic site")
     serve_mock.add_argument("--scenario", default=os.environ.get("JOBTRACE_SCENARIO", "baseline"))
     serve_mock.add_argument("--port", type=int, default=_env_int("JOBTRACE_MOCK_PORT", 8765))
@@ -100,7 +111,7 @@ def main(argv: list[str] | None = None) -> int:
     handlers: dict[str, Callable[[argparse.Namespace], int]] = {
         "demo": command_demo, "collect": command_collect, "report": command_report,
         "serve-mock": command_serve_mock, "serve-review": command_serve_review,
-        "lint-size": command_lint_size,
+        "lint-size": command_lint_size, "concentration": command_concentration,
     }
     try:
         return handlers[args.command](args)

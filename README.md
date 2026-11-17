@@ -68,6 +68,7 @@ python -m jobtrace demo --no-serve --run-id demo-001
 python -m jobtrace collect --with-mock --scenario day2 --run-id day2-001
 python -m jobtrace collect --base-url http://127.0.0.1:8765 --scenario malformed
 python -m jobtrace report --db var/jobtrace.sqlite3 --out var/reports
+python -m jobtrace concentration --run-id day2-001 --registry configs/employers.yaml
 python -m jobtrace serve-mock --scenario flaky --port 8765
 python -m jobtrace serve-review --db var/jobtrace.sqlite3 --port 8766
 ```
@@ -137,5 +138,6 @@ make lint-size
 - [docs/CONFIG.md](docs/CONFIG.md)
 - [docs/DATA_MODEL.md](docs/DATA_MODEL.md)
 - [docs/LIFECYCLE.md](docs/LIFECYCLE.md)
+- [docs/EMPLOYERS.md](docs/EMPLOYERS.md)
 - [docs/COMPLIANCE.md](docs/COMPLIANCE.md)
 - [docs/RUNBOOK.md](docs/RUNBOOK.md)

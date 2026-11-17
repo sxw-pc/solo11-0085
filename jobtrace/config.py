@@ -18,6 +18,7 @@ from .yamlio import integer, number, port_list, read_yaml, strict_map, text, tex
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG = PROJECT_ROOT / "configs" / "default.yaml"
 DEFAULT_SELECTORS = PROJECT_ROOT / "configs" / "selectors.yaml"
+DEFAULT_EMPLOYERS = PROJECT_ROOT / "configs" / "employers.yaml"
 
 
 @dataclass(frozen=True)

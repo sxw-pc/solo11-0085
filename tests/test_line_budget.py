@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from jobtrace.lint_size import check
+from jobtrace.lint_size import MAX_TOTAL_LINES, MIN_TOTAL_LINES, check
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_line_budget_and_per_file_limit():
     report = check(ROOT)
-    assert 2500 <= report.total <= 4500
+    assert MIN_TOTAL_LINES <= report.total <= MAX_TOTAL_LINES
     assert report.oversized == {}
     assert report.files["README.md"] <= 300
     assert report.files["jobtrace/lifecycle.py"] <= 300

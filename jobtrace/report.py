@@ -179,6 +179,69 @@ def render_markdown(report: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def render_concentration_markdown(result: dict[str, Any]) -> str:
+    """Deterministic Markdown for the single-run employer concentration audit."""
+    lines = [
+        "# 雇主集中度审计（单次完整采集）", "",
+        "> 仅基于本地合成雇主注册表与该 run 的岗位快照；不合并跨站相似岗位，不改写原始数据。", "",
+        f"- 运行：`{result['run_id']}`",
+        f"- 注册表版次：`{result['registry_version']}`，分析规则版次：`{result['rules_version']}`",
+        f"- 分析状态：`{result['status']}`",
+    ]
+    postings = result.get("postings")
+    if postings:
+        lines.append(
+            f"- 刊登数：{postings['total']}（已知 {postings['known']} / "
+            f"未知 {postings['unknown']} / 未观测 {postings['unobserved']}）"
+        )
+    if result["reasons"]:
+        lines.extend(["", "## 精确度说明与原因", ""])
+        lines.extend(f"- `{item['code']}`：{item['detail']}" for item in result["reasons"])
+    for contract in result["contracts"].values():
+        lines.extend(["", f"## {contract['label']}（`{contract['contract']}`）", ""])
+        lines.append(f"- 分母（刊登数）：{contract['denominator']}")
+        hhi = contract.get("hhi")
+        if not hhi:
+            lines.append("- HHI：无法得出（见上方原因）")
+            continue
+        point = "（单点）" if hhi["point"] else "（非单点区间）"
+        lines.append(f"- HHI 可行区间：`[{hhi['min']}, {hhi['max']}]`{point}")
+        ends = (("min", "组织归属"),) if hhi["point"] else (
+            ("min", "最小值端组织归属"), ("max", "最大值端组织归属"))
+        for end, label in ends:
+            witness = contract["witnesses"][end]
+            lines.append(f"- {label}：")
+            for share in witness["shares"]:
+                lines.append(
+                    f"  - {share['id']}（{share['name']}）："
+                    f"{share['postings']} 刊登，份额 {share['share']}"
+                )
+            lines.append(f"  - 指派见证：`{canonical_json(witness['jobs'])}`")
+    if result["unknown_companies"]:
+        lines.extend(["", "## 未知来源（不各自当作互不相关的公司）", ""])
+        for entry in result["unknown_companies"]:
+            display = entry["display"] or "（空公司名）"
+            lines.append(f"- {display}：{entry['postings']} 刊登，原因 `{entry['reason']}`")
+    if result.get("input_fingerprint"):
+        lines.extend(["", f"- 输入指纹：`{result['input_fingerprint']}`"])
+    lines.append("")
+    return "\n".join(lines)
+
+
+def write_concentration_files(result: dict[str, Any], output_dir: str | Path) -> dict[str, str]:
+    """Write the employer concentration audit (JSON + Markdown) for one run."""
+    output = Path(output_dir)
+    output.mkdir(parents=True, exist_ok=True)
+    paths = {"markdown": output / "concentration.md", "json": output / "concentration.json"}
+    paths["json"].write_text(
+        json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    paths["markdown"].write_text(
+        render_concentration_markdown(result) + "\n", encoding="utf-8"
+    )
+    return {key: str(path.resolve()) for key, path in paths.items()}
+
+
 def _csv_value(value: Any) -> Any:
     if isinstance(value, bool):
         return "true" if value else "false"

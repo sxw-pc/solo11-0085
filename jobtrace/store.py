@@ -159,6 +159,15 @@ class Store:
         rows = self.conn.execute(sql + " ORDER BY external_id LIMIT ?", (*params, limit))
         return [dict(row) for row in rows]
 
+    def run_snapshots(self, run_id: str) -> list[dict[str, Any]]:
+        """Observed job snapshots of one run, ordered by job_uid (read-only)."""
+        rows = self.conn.execute(
+            """SELECT job_uid, run_id, content_hash, payload_json, observed_at
+            FROM job_snapshots WHERE run_id = ? ORDER BY job_uid""",
+            (run_id,),
+        )
+        return [dict(row) for row in rows]
+
     def list_snapshots(self, job_uid: str) -> list[dict[str, Any]]:
         rows = self.conn.execute(
             """SELECT job_uid, run_id, content_hash, payload_json, observed_at
