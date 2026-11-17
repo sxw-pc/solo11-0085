@@ -114,6 +114,8 @@ def build_report(store: Store, clock: Clock, site_key: str | None = None) -> dic
             {key: notes.get(key, {} if key == "selector_misses" else [])
              for key in ("lifecycle", "failures", "warnings", "selector_misses")}
         )
+        latest_payload["contract"] = notes.get("contract", "fixed_snapshot")
+        latest_payload["list_verdict"] = notes.get("list_verdict", {})
     raw_count = len(store.raw_documents_for_run(latest["run_id"])) if latest else 0
     return {
         "schema_version": 1, "generated_at": iso_z(clock.now()),
@@ -176,6 +178,21 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"- 选择器缺失统计：`{canonical_json(latest.get('selector_misses', {}) if latest else {})}`",
         "",
     ])
+    verdict = (latest or {}).get("list_verdict") or {}
+    if verdict:
+        segments = "、".join(
+            f"{segment['snapshot_id']} 页 {segment['coverage_ranges']}"
+            for segment in verdict.get("segments", [])
+        ) or "（无）"
+        lines.extend([
+            "## 列表快照证据", "",
+            f"- 采集合同：`{verdict.get('contract')}`",
+            f"- 本轮是否可声称找到全部岗位：`{str(verdict.get('claims_all_jobs')).lower()}`"
+            f"（同一快照整链证明：`{str(verdict.get('complete')).lower()}`）",
+            f"- 快照分段覆盖：{segments}",
+            f"- 冲突见证：{len(verdict.get('witnesses', []))} 条",
+            "",
+        ])
     return "\n".join(lines)
 
 

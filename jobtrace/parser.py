@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from typing import Any
 from urllib.parse import urljoin, urlsplit
 
 from bs4 import BeautifulSoup, Tag
@@ -13,6 +14,7 @@ from .normalize import (
     clean_text, normalize_employment_type, normalize_experience,
     normalize_location, normalize_tags,
 )
+from .page_epoch import PageDeclaration, PageObservation, items_digest
 from .salary import parse_salary
 from .selectors import Selectors
 
@@ -26,6 +28,9 @@ class ListPage:
     card_count: int
     issues: tuple[str, ...] = ()
     selector_misses: dict[str, int] = field(default_factory=dict)
+    declaration: PageDeclaration = field(
+        default_factory=lambda: PageDeclaration(None, None, None))
+    prev_url: str | None = None
 
 
 @dataclass(frozen=True)
@@ -60,6 +65,41 @@ def _select_all(root: Tag, selector: str) -> list[Tag]:
 
 def _missing(counter: dict[str, int], field_name: str) -> None:
     counter[field_name] = counter.get(field_name, 0) + 1
+
+
+def _int_attr(node: Tag | None, attribute: str) -> int | None:
+    if node is None:
+        return None
+    raw = (node.get(attribute) or "").strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        return None
+    return value if value >= 1 else None
+
+
+def _declaration(soup: BeautifulSoup, page_url: str, selectors: Selectors,
+                 misses: dict[str, int], issues: list[str]) -> PageDeclaration:
+    """Read the synthetic page's snapshot_id / page index / total pages claim."""
+
+    node = _select_one(soup, selectors.list.page_state)
+    if node is None:
+        _missing(misses, "page_state")
+        issues.append("missing list-page state declaration")
+        return PageDeclaration(None, None, None, ("page_state missing",))
+    snapshot = clean_text(node.get(selectors.list.snapshot_id_attr) or "")
+    index = _int_attr(node, selectors.list.page_index_attr)
+    total = _int_attr(node, selectors.list.total_pages_attr)
+    problems: list[str] = []
+    if not snapshot:
+        problems.append("snapshot_id missing")
+    if index is None:
+        problems.append("page index missing or invalid")
+    if total is None:
+        problems.append("total_pages missing or invalid")
+    elif index is not None and total < index:
+        problems.append(f"total_pages {total} is below page index {index}")
+    return PageDeclaration(snapshot or None, index, total, tuple(problems))
 
 
 def parse_list_page(html: str, page_url: str, selectors: Selectors) -> ListPage:
@@ -104,9 +144,28 @@ def parse_list_page(html: str, page_url: str, selectors: Selectors) -> ListPage:
     next_href = (next_node.get("href") or "").strip() if next_node is not None else ""
     if not next_node:
         _missing(misses, "next_page")
+    prev_node = _select_one(soup, selectors.list.prev_page)
+    prev_href = (prev_node.get("href") or "").strip() if prev_node is not None else ""
+    if not prev_node:
+        _missing(misses, "prev_page")
+    declaration = _declaration(soup, page_url, selectors, misses, issues)
     return ListPage(
         items=tuple(items), next_url=urljoin(page_url, next_href) if next_href else None,
         card_count=len(cards), issues=tuple(issues), selector_misses=misses,
+        declaration=declaration,
+        prev_url=urljoin(page_url, prev_href) if prev_href else None,
+    )
+
+
+def page_observation(response: Any, page_url: str, page: ListPage) -> PageObservation:
+    """Bind a parsed list page to its raw response bytes and snapshot declaration."""
+
+    return PageObservation(
+        url=response.url, normalized_url=page_url, sha256=response.sha256,
+        http_status=response.status, declared=page.declaration,
+        items=tuple(item.external_id for item in page.items),
+        item_digest=items_digest(page.items), next_url=page.next_url,
+        prev_url=page.prev_url,
     )
 
 

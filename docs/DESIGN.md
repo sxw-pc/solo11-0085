@@ -25,7 +25,10 @@
 | `config.py` | YAML 严格校验、点号覆盖、环境变量、路径解析、配置指纹 |
 | `clock.py` | 系统时钟、固定时钟、ISO-8601 解析与秒级规范化 |
 | `http_client.py` | loopback 守卫、超时、有限重试、响应大小上限、请求统计 |
-| `pagination.py` | 下一页归一化、最大页数、重复 URL 检测、JSON 游标 |
+| `pagination.py` | 下一页归一化、最大页数、重复 URL 检测、带页证据的 JSON 游标 |
+| `page_epoch.py` | 快照代号内的页链证据、缺口/冲突见证、覆盖范围 |
+| `page_contracts.py` | `fixed_snapshot` / `live_observation` 两种完整性裁决 |
+| `resume.py` | 恢复时逐字节重验游标前缀 |
 | `crawler.py` | 列表/详情编排、重复 ID 去重、故障隔离、完整运行判定 |
 | `parser.py` | CSS 选择器解析、缺失统计、畸形卡片隔离 |
 | `normalize.py` | 空白/NFKC、地点、经验、雇佣类型、标签清洗 |
@@ -63,11 +66,15 @@
 只有同时满足以下条件才允许处理“缺失岗位”：
 
 - 列表遍历没有被循环、页数上限、详情上限或致命抓取错误截断；
+- **某一 `snapshot_id` 的页 1 到终页形成无缺口、无重复、`next_url` 相连的整链证明**
+  （自然结束不能替代该证明，见 `docs/PAGE_EPOCH.md`）；
+- 采集合同为 `fixed_snapshot`；`live_observation` 只产出分段局部观察，永不完整；
 - 没有详情抓取/解析失败；
 - 不是从游标恢复的部分运行；
 - 发现了岗位且至少产生一个有效观测。
 
-完整运行示例：`baseline`、`flaky`。不完整示例：`malformed`、`pagination_loop`、恢复运行。这样可避免因临时故障误关闭岗位。
+完整运行示例：`baseline`、`flaky`。不完整示例：`malformed`、`pagination_loop`、
+恢复运行、翻页期间快照切换。这样可避免因临时故障或跨快照拼接误关闭岗位。
 
 ## 确定性
 

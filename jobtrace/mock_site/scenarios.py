@@ -73,6 +73,12 @@ class ScenarioController:
     def total_pages(self) -> int:
         return max(1, math.ceil(len(self.data.jobs) / self.page_size))
 
+    @property
+    def snapshot_id(self) -> str:
+        """Controllable identifier for the currently served list snapshot."""
+
+        return str(self.data.listing.get("snapshot_id") or self.name)
+
     def _duplicate_on_page(self, job_id: str, page: int) -> dict[str, Any] | None:
         for index, job in enumerate(self.data.jobs):
             if job["id"] == job_id:

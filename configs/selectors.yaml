@@ -7,6 +7,11 @@ list:
   location: "span.job-location"
   salary: "span.job-salary"
   next_page: "a.next-page"
+  prev_page: "a.prev-page"
+  page_state: "div.page-state"
+  snapshot_id_attr: "data-snapshot-id"
+  page_index_attr: "data-page"
+  total_pages_attr: "data-total-pages"
 
 detail:
   title: "h1.job-title"

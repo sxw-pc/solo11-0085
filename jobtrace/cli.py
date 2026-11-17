@@ -59,6 +59,8 @@ def build_parser() -> argparse.ArgumentParser:
     demo.add_argument("--review-port", type=int, default=_env_int("JOBTRACE_REVIEW_PORT", 8766))
     demo.add_argument("--fixtures-dir", default=str(FIXTURES_DIR))
     demo.add_argument("--run-id", default=None)
+    demo.add_argument("--contract", choices=["fixed_snapshot", "live_observation"],
+                      default="fixed_snapshot", help="list completeness contract")
     demo.add_argument("--no-serve", action="store_true", help="exit after one-shot setup")
 
     collect = commands.add_parser("collect", help="run one incremental collection")
@@ -69,6 +71,8 @@ def build_parser() -> argparse.ArgumentParser:
     collect.add_argument("--fixtures-dir", default=str(FIXTURES_DIR))
     collect.add_argument("--run-id", default=None)
     collect.add_argument("--resume", action="store_true", help="resume from list cursor")
+    collect.add_argument("--contract", choices=["fixed_snapshot", "live_observation"],
+                         default="fixed_snapshot", help="list completeness contract")
     collect.add_argument("--no-report", action="store_true")
 
     report = commands.add_parser("report", help="render reports from SQLite")

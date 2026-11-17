@@ -16,6 +16,18 @@ def normalized_page_url(url: str) -> str:
     return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), parts.path or "/", query, ""))
 
 
+def page_number(url: str, page_param: str) -> int | None:
+    """Read the declared page index from a URL query parameter."""
+
+    for key, value in parse_qsl(urlsplit(url).query, keep_blank_values=True):
+        if key == page_param:
+            try:
+                return int(value)
+            except ValueError:
+                return None
+    return None
+
+
 @dataclass
 class Cursor:
     version: int
@@ -25,6 +37,9 @@ class Cursor:
     page_count: int
     completed: bool
     updated_at: str
+    snapshot_id: str | None = None
+    contract: str | None = None
+    pages: list[dict[str, object]] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -46,12 +61,18 @@ class Cursor:
             return None
         try:
             payload = json.loads(source.read_text(encoding="utf-8"))
+            pages = payload.get("pages", [])
+            if not isinstance(pages, list) or any(not isinstance(page, dict) for page in pages):
+                raise ValueError("pages must be a list of objects")
             cursor = cls(
                 version=int(payload["version"]), site_key=str(payload["site_key"]),
                 next_url=payload.get("next_url"),
                 visited_pages=[str(url) for url in payload["visited_pages"]],
                 page_count=int(payload["page_count"]), completed=bool(payload["completed"]),
                 updated_at=str(payload["updated_at"]),
+                snapshot_id=payload.get("snapshot_id"),
+                contract=payload.get("contract"),
+                pages=[dict(page) for page in pages],
             )
         except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError) as exc:
             raise PaginationError(f"invalid pagination cursor: {source}: {exc}") from exc
@@ -95,7 +116,11 @@ class PaginationGuard:
         return next_url
 
     def cursor(self, *, site_key: str, next_url: str | None,
-               updated_at: str, completed: bool) -> Cursor:
+               updated_at: str, completed: bool, snapshot_id: str | None = None,
+               contract: str | None = None,
+               pages: list[dict[str, object]] | None = None) -> Cursor:
         return Cursor(version=1, site_key=site_key, next_url=next_url,
                       visited_pages=list(self.visited), page_count=self.page_count,
-                      completed=completed, updated_at=updated_at)
+                      completed=completed, updated_at=updated_at,
+                      snapshot_id=snapshot_id, contract=contract,
+                      pages=list(pages or []))

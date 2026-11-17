@@ -55,6 +55,7 @@ def run_collection(
     resume: bool = False,
     clock: Clock | None = None,
     sleep: Any = None,
+    contract: str = "fixed_snapshot",
 ) -> CollectionOutcome:
     config = loaded.config
     selected_scenario = scenario or config.site.scenario
@@ -71,7 +72,7 @@ def run_collection(
         store.begin_run(run_id=identifier, site_key=config.site.name,
                         scenario=selected_scenario, base_url=config.site.base_url,
                         config_hash=loaded.fingerprint, started_at=started_at, resumed=resume)
-        crawler = Crawler(loaded, client, raw_store, active_clock)
+        crawler = Crawler(loaded, client, raw_store, active_clock, contract=contract)
         try:
             result = crawler.crawl(identifier, resume=resume)
         except Exception as exc:
@@ -97,6 +98,7 @@ def run_collection(
         notes = {
             "failures": failure_payload(result)[:50], "warnings": result.warnings[:100],
             "selector_misses": result.selector_misses,
+            "contract": result.contract, "list_verdict": result.list_verdict,
             "request_stats": result.request_stats, "lifecycle": lifecycle.summary(),
         }
         store.finish_run(

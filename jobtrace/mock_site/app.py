@@ -88,7 +88,7 @@ def create_app(scenario: str = "baseline", *, fixtures_dir: str | Path = FIXTURE
         cards, next_url = controller.page_cards(page)
         return render_template("list.html", jobs=cards, next_url=next_url, page=page,
                                pages=controller.total_pages, total_jobs=len(controller.data.jobs),
-                               scenario=controller.name)
+                               scenario=controller.name, snapshot_id=controller.snapshot_id)
 
     @app.get("/jobs/<job_id>")
     def job_detail(job_id: str):

@@ -3,6 +3,8 @@
 {% block content %}
 <h1>公开岗位列表</h1>
 <p>场景 <code>{{ scenario }}</code> · 第 {{ page }} / {{ pages }} 页 · 共 {{ total_jobs }} 条合成岗位</p>
+<div class="page-state" data-snapshot-id="{{ snapshot_id }}" data-page="{{ page }}"
+     data-total-pages="{{ pages }}"></div>
 <ul class="job-list">
   {% for job in jobs %}
   <li class="job-card" data-job-id="{{ job.id }}">
@@ -23,7 +25,7 @@
   {% endfor %}
 </ul>
 <div class="pager">
-  <span>{% if page > 1 %}<a href="/jobs?page={{ page - 1 }}">上一页</a>{% endif %}</span>
+  <span>{% if page > 1 %}<a class="prev-page" href="/jobs?page={{ page - 1 }}">上一页</a>{% endif %}</span>
   <span>{% if next_url %}<a class="next-page" rel="next" href="{{ next_url }}">下一页</a>{% endif %}</span>
 </div>
 {% endblock %}

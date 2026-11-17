@@ -9,7 +9,11 @@ from typing import Any, Mapping
 from .errors import ConfigError
 from .yamlio import read_yaml, strict_map, text
 
-LIST_KEYS = {"item", "link", "job_id_attr", "title", "company", "location", "salary", "next_page"}
+LIST_KEYS = {
+    "item", "link", "job_id_attr", "title", "company", "location", "salary",
+    "next_page", "prev_page", "page_state", "snapshot_id_attr", "page_index_attr",
+    "total_pages_attr",
+}
 DETAIL_KEYS = {"title", "company", "location", "salary", "experience", "employment_type",
                "description", "posted_at", "status", "tags"}
 
@@ -24,6 +28,11 @@ class ListSelectors:
     location: str
     salary: str
     next_page: str
+    prev_page: str
+    page_state: str
+    snapshot_id_attr: str
+    page_index_attr: str
+    total_pages_attr: str
 
 
 @dataclass(frozen=True)
