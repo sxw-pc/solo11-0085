@@ -1,13 +1,9 @@
 """Selector-driven parsing for listing and detail pages."""
-
 from __future__ import annotations
-
 import re
 from dataclasses import dataclass, field
 from urllib.parse import urljoin, urlsplit
-
 from bs4 import BeautifulSoup, Tag
-
 from .models import JobObservation, ListItem
 from .normalize import (
     clean_text, normalize_employment_type, normalize_experience,
@@ -15,10 +11,8 @@ from .normalize import (
 )
 from .salary import parse_salary
 from .selectors import Selectors
-
+from .requirements import parse_requirements
 _JOB_ID = re.compile(r"/jobs/([^/?#]+)")
-
-
 @dataclass(frozen=True)
 class ListPage:
     items: tuple[ListItem, ...]
@@ -26,42 +20,28 @@ class ListPage:
     card_count: int
     issues: tuple[str, ...] = ()
     selector_misses: dict[str, int] = field(default_factory=dict)
-
-
 @dataclass(frozen=True)
 class DetailResult:
     observation: JobObservation | None
     required_missing: tuple[str, ...] = ()
     issues: tuple[str, ...] = ()
     selector_misses: dict[str, int] = field(default_factory=dict)
-
     @property
-    def ok(self) -> bool:
-        return self.observation is not None
-
-
+    def ok(self) -> bool: return self.observation is not None
 def _text(node: Tag | None) -> str:
     return clean_text(node.get_text(" ", strip=True)) if node is not None else ""
-
-
 def _select_one(root: Tag, selector: str) -> Tag | None:
     try:
         return root.select_one(selector)
     except Exception:  # BeautifulSoup raises several selector-specific errors.
         return None
-
-
 def _select_all(root: Tag, selector: str) -> list[Tag]:
     try:
         return list(root.select(selector))
     except Exception:
         return []
-
-
 def _missing(counter: dict[str, int], field_name: str) -> None:
     counter[field_name] = counter.get(field_name, 0) + 1
-
-
 def parse_list_page(html: str, page_url: str, selectors: Selectors) -> ListPage:
     soup = BeautifulSoup(html, "html.parser")
     cards = _select_all(soup, selectors.list.item)
@@ -102,14 +82,11 @@ def parse_list_page(html: str, page_url: str, selectors: Selectors) -> ListPage:
         ))
     next_node = _select_one(soup, selectors.list.next_page)
     next_href = (next_node.get("href") or "").strip() if next_node is not None else ""
-    if not next_node:
-        _missing(misses, "next_page")
+    if not next_node: _missing(misses, "next_page")
     return ListPage(
         items=tuple(items), next_url=urljoin(page_url, next_href) if next_href else None,
         card_count=len(cards), issues=tuple(issues), selector_misses=misses,
     )
-
-
 def _optional(soup: BeautifulSoup, selector: str, key: str,
               misses: dict[str, int], issues: list[str]) -> str:
     value = _text(_select_one(soup, selector))
@@ -117,8 +94,6 @@ def _optional(soup: BeautifulSoup, selector: str, key: str,
         _missing(misses, key)
         issues.append(f"missing optional field: {key}")
     return value
-
-
 def parse_detail_page(html: str, page_url: str, site_key: str,
                       item: ListItem, selectors: Selectors) -> DetailResult:
     soup = BeautifulSoup(html, "html.parser")
@@ -158,14 +133,11 @@ def parse_detail_page(html: str, page_url: str, site_key: str,
         description=description,
         tags=normalize_tags([node.get_text(" ", strip=True) for node in tag_nodes]),
         detail_url=page_url, posted_at=posted_at or None, source_status=status or None,
-        issues=tuple(issues),
+        issues=tuple(issues), requirement_parse=parse_requirements(description),
     )
     return DetailResult(observation=observation, issues=tuple(issues), selector_misses=misses)
-
-
 def merge_selector_misses(*maps: dict[str, int]) -> dict[str, int]:
     merged: dict[str, int] = {}
     for mapping in maps:
-        for key, value in mapping.items():
-            merged[key] = merged.get(key, 0) + value
+        for key, value in mapping.items(): merged[key] = merged.get(key, 0) + value
     return dict(sorted(merged.items()))

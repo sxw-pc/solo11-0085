@@ -1,11 +1,8 @@
 """Incremental list/detail crawl with isolation, guards, and checkpoints."""
-
 from __future__ import annotations
-
 from dataclasses import asdict, dataclass, field
 from typing import Any
 from urllib.parse import urlencode
-
 from .clock import Clock, iso_z
 from .config import LoadedConfig
 from .errors import FetchError, PaginationLimitError, PaginationLoopError
@@ -14,8 +11,6 @@ from .models import JobObservation, ListItem
 from .pagination import Cursor, PaginationGuard
 from .parser import merge_selector_misses, parse_detail_page, parse_list_page
 from .rawstore import RawDocument, RawStore
-
-
 @dataclass(frozen=True)
 class DetailFailure:
     external_id: str
@@ -23,8 +18,6 @@ class DetailFailure:
     error: str
     status: int | None = None
     retryable: bool = False
-
-
 @dataclass
 class CrawlResult:
     run_id: str
@@ -47,7 +40,6 @@ class CrawlResult:
     complete: bool = True
     resumed: bool = False
     request_stats: dict[str, Any] = field(default_factory=dict)
-
     def summary(self) -> dict[str, Any]:
         return {
             "run_id": self.run_id, "site_key": self.site_key,
@@ -59,8 +51,6 @@ class CrawlResult:
             "complete": self.complete, "resumed": self.resumed,
             "request_stats": self.request_stats,
         }
-
-
 class Crawler:
     def __init__(self, loaded: LoadedConfig, client: HttpClient,
                  raw_store: RawStore, clock: Clock):
@@ -70,33 +60,26 @@ class Crawler:
         self.client = client
         self.raw_store = raw_store
         self.clock = clock
-
     def _first_url(self) -> str:
         separator = "&" if "?" in self.site.list_path else "?"
         return f"{self.site.base_url}{self.site.list_path}{separator}{urlencode({self.site.page_param: 1})}"
-
     def _document(self, response: HttpResponse, kind: str, run_id: str) -> RawDocument:
         return self.raw_store.put(
             response.content, url=response.url, kind=kind, run_id=run_id,
             http_status=response.status, content_type=response.content_type,
             fetched_at=response.fetched_at,
         )
-
     def _save_cursor(self, guard: PaginationGuard, next_url: str | None, completed: bool) -> None:
         cursor = guard.cursor(
             site_key=self.site.name, next_url=next_url,
             updated_at=iso_z(self.clock.now()), completed=completed,
         )
         cursor.save(self.loaded.config.storage.checkpoint)
-
     def _resume_cursor(self) -> Cursor | None:
         cursor = Cursor.load(self.loaded.config.storage.checkpoint)
-        if cursor is None or cursor.site_key != self.site.name:
-            return None
-        if cursor.completed or not cursor.next_url:
-            return None
+        if cursor is None or cursor.site_key != self.site.name: return None
+        if cursor.completed or not cursor.next_url: return None
         return cursor
-
     def crawl(self, run_id: str, *, resume: bool = False) -> CrawlResult:
         started_at = iso_z(self.clock.now())
         guard = PaginationGuard(max_pages=self.site.max_pages)
@@ -112,7 +95,6 @@ class Crawler:
             guard = PaginationGuard(max_pages=self.site.max_pages)
             start_url, resumed = self._first_url(), False
             guard.start(start_url)
-
         observations: list[JobObservation] = []
         failures: list[DetailFailure] = []
         documents: list[RawDocument] = []
@@ -146,9 +128,7 @@ class Crawler:
                 stop_reason, fatal, next_url = "pagination_limit", True, None
             self._save_cursor(guard, next_url, completed=next_url is None)
             current_url = next_url
-            if fatal:
-                break
-
+            if fatal: break
         items = list(discovered.values())
         if len(items) > self.site.max_details:
             warnings.append(
@@ -184,21 +164,16 @@ class Crawler:
                     external_id=item.external_id, url=item.detail_url,
                     error=f"unexpected detail error: {exc}",
                 ))
-
         if resumed:
             fatal = True
-            if stop_reason == "natural_end":
-                stop_reason = "resumed_partial"
-        if not discovered:
-            fatal, stop_reason = True, "no_jobs"
+            if stop_reason == "natural_end": stop_reason = "resumed_partial"
+        if not discovered: fatal, stop_reason = True, "no_jobs"
         if not observations and not failures and not fatal:
             fatal, stop_reason = True, "no_details"
         if failures:
             fatal = True
-            if stop_reason == "natural_end":
-                stop_reason = "detail_failures"
-        if fatal and stop_reason == "natural_end":
-            stop_reason = "incomplete"
+            if stop_reason == "natural_end": stop_reason = "detail_failures"
+        if fatal and stop_reason == "natural_end": stop_reason = "incomplete"
         return CrawlResult(
             run_id=run_id, site_key=self.site.name, started_at=started_at,
             finished_at=iso_z(self.clock.now()), pages_fetched=pages_fetched,
@@ -210,7 +185,5 @@ class Crawler:
             stop_reason=stop_reason, complete=not fatal, resumed=resumed,
             request_stats=self.client.stats.as_dict(),
         )
-
-
 def failure_payload(result: CrawlResult) -> list[dict[str, Any]]:
     return [asdict(failure) for failure in result.failures]

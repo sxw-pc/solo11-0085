@@ -1,25 +1,19 @@
 """YAML configuration loading, strict validation, and loopback guardrails."""
-
 from __future__ import annotations
-
 import ipaddress
 import os
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import urlsplit
-
 from .clock import parse_instant
 from .errors import ConfigError
 from .fingerprint import config_fingerprint
 from .selectors import Selectors, load_selectors
 from .yamlio import integer, number, port_list, read_yaml, strict_map, text, text_list
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG = PROJECT_ROOT / "configs" / "default.yaml"
 DEFAULT_SELECTORS = PROJECT_ROOT / "configs" / "selectors.yaml"
-
-
 @dataclass(frozen=True)
 class SiteConfig:
     name: str
@@ -32,8 +26,6 @@ class SiteConfig:
     allowed_hosts: tuple[str, ...]
     allowed_ports: tuple[int, ...]
     scenario: str
-
-
 @dataclass(frozen=True)
 class CrawlConfig:
     connect_timeout_seconds: float
@@ -43,26 +35,16 @@ class CrawlConfig:
     max_response_bytes: int
     request_interval_seconds: float
     user_agent: str
-
-
 @dataclass(frozen=True)
 class StorageConfig:
     database: str
     raw_dir: str
     report_dir: str
     checkpoint: str
-
-
 @dataclass(frozen=True)
-class LifecycleConfig:
-    close_after_missing_runs: int
-
-
+class LifecycleConfig: close_after_missing_runs: int
 @dataclass(frozen=True)
-class ClockConfig:
-    fixed_at: str | None
-
-
+class ClockConfig: fixed_at: str | None
 @dataclass(frozen=True)
 class AppConfig:
     site: SiteConfig
@@ -70,8 +52,6 @@ class AppConfig:
     storage: StorageConfig
     lifecycle: LifecycleConfig
     clock: ClockConfig
-
-
 @dataclass(frozen=True)
 class LoadedConfig:
     config: AppConfig
@@ -79,8 +59,6 @@ class LoadedConfig:
     fingerprint: str
     config_path: str
     selectors_path: str
-
-
 def _loopback_host(host: str, context: str) -> None:
     try:
         address = ipaddress.ip_address(host)
@@ -88,8 +66,6 @@ def _loopback_host(host: str, context: str) -> None:
         raise ConfigError(f"{context} must be a literal loopback IP, got {host!r}") from exc
     if not address.is_loopback:
         raise ConfigError(f"{context} is not a loopback address: {host}")
-
-
 def _validate_base_url(base_url: str, hosts: tuple[str, ...], ports: tuple[int, ...]) -> None:
     parts = urlsplit(base_url)
     if parts.scheme not in {"http", "https"}:
@@ -107,8 +83,6 @@ def _validate_base_url(base_url: str, hosts: tuple[str, ...], ports: tuple[int, 
     port = parts.port or (443 if parts.scheme == "https" else 80)
     if port not in ports:
         raise ConfigError(f"site.base_url port {port} is not in site.allowed_ports")
-
-
 def _parse_site(raw: Any) -> SiteConfig:
     keys = {
         "name", "base_url", "list_path", "page_param", "page_size", "max_pages",
@@ -116,14 +90,12 @@ def _parse_site(raw: Any) -> SiteConfig:
     }
     data = strict_map(raw, keys, "site")
     hosts = text_list(data["allowed_hosts"], "site.allowed_hosts")
-    for host in hosts:
-        _loopback_host(host, "site.allowed_hosts")
+    for host in hosts: _loopback_host(host, "site.allowed_hosts")
     ports = port_list(data["allowed_ports"], "site.allowed_ports")
     base_url = text(data["base_url"], "site.base_url").rstrip("/")
     _validate_base_url(base_url, hosts, ports)
     list_path = text(data["list_path"], "site.list_path")
-    if not list_path.startswith("/"):
-        raise ConfigError("site.list_path must start with /")
+    if not list_path.startswith("/"): raise ConfigError("site.list_path must start with /")
     return SiteConfig(
         name=text(data["name"], "site.name"), base_url=base_url, list_path=list_path,
         page_param=text(data["page_param"], "site.page_param"),
@@ -133,8 +105,6 @@ def _parse_site(raw: Any) -> SiteConfig:
         allowed_hosts=hosts, allowed_ports=ports,
         scenario=text(data["scenario"], "site.scenario"),
     )
-
-
 def _parse_crawl(raw: Any) -> CrawlConfig:
     keys = {
         "connect_timeout_seconds", "read_timeout_seconds", "max_retries",
@@ -156,8 +126,6 @@ def _parse_crawl(raw: Any) -> CrawlConfig:
             data["request_interval_seconds"], "crawl.request_interval_seconds", 0, 10),
         user_agent=text(data["user_agent"], "crawl.user_agent"),
     )
-
-
 def _resolve_path(value: Any, context: str, config_path: Path) -> str:
     raw = Path(text(value, context)).expanduser()
     if not raw.is_absolute():
@@ -165,8 +133,6 @@ def _resolve_path(value: Any, context: str, config_path: Path) -> str:
         base = base.parent if base.name == "configs" else base
         raw = base / raw
     return str(raw.resolve())
-
-
 def _parse_storage(raw: Any, config_path: Path) -> StorageConfig:
     data = strict_map(raw, {"database", "raw_dir", "report_dir", "checkpoint"}, "storage")
     return StorageConfig(
@@ -175,15 +141,11 @@ def _parse_storage(raw: Any, config_path: Path) -> StorageConfig:
         report_dir=_resolve_path(data["report_dir"], "storage.report_dir", config_path),
         checkpoint=_resolve_path(data["checkpoint"], "storage.checkpoint", config_path),
     )
-
-
 def _parse_lifecycle(raw: Any) -> LifecycleConfig:
     data = strict_map(raw, {"close_after_missing_runs"}, "lifecycle")
     return LifecycleConfig(close_after_missing_runs=integer(
         data["close_after_missing_runs"], "lifecycle.close_after_missing_runs", 1, 365
     ))
-
-
 def _parse_clock(raw: Any) -> ClockConfig:
     data = strict_map(raw, {"fixed_at"}, "clock")
     fixed = data["fixed_at"]
@@ -191,8 +153,6 @@ def _parse_clock(raw: Any) -> ClockConfig:
         fixed = text(fixed, "clock.fixed_at")
         parse_instant(fixed)
     return ClockConfig(fixed_at=fixed)
-
-
 def _apply_overrides(raw: dict[str, Any], overrides: Mapping[str, Any]) -> None:
     for dotted, value in overrides.items():
         if not isinstance(dotted, str) or "." not in dotted:
@@ -204,8 +164,6 @@ def _apply_overrides(raw: dict[str, Any], overrides: Mapping[str, Any]) -> None:
                 raise ConfigError(f"cannot override missing mapping: {dotted}")
             node = node[part]
         node[parts[-1]] = value
-
-
 def _apply_environment(raw: dict[str, Any], environ: Mapping[str, str]) -> None:
     mapping = {
         "JOBTRACE_BASE_URL": "site.base_url", "JOBTRACE_SCENARIO": "site.scenario",
@@ -215,10 +173,7 @@ def _apply_environment(raw: dict[str, Any], environ: Mapping[str, str]) -> None:
     }
     overrides = {dotted: (None if key == "JOBTRACE_CLOCK" and environ[key].lower() == "system"
                           else environ[key]) for key, dotted in mapping.items() if environ.get(key)}
-    if overrides:
-        _apply_overrides(raw, overrides)
-
-
+    if overrides: _apply_overrides(raw, overrides)
 def load_config(config_path: str | Path = DEFAULT_CONFIG,
                 selectors_path: str | Path = DEFAULT_SELECTORS, *,
                 overrides: Mapping[str, Any] | None = None,
@@ -226,8 +181,7 @@ def load_config(config_path: str | Path = DEFAULT_CONFIG,
     path = Path(config_path)
     raw = read_yaml(path)
     _apply_environment(raw, os.environ if environ is None else environ)
-    if overrides:
-        _apply_overrides(raw, overrides)
+    if overrides: _apply_overrides(raw, overrides)
     strict_map(raw, {"site", "crawl", "storage", "lifecycle", "clock"}, "root")
     config = AppConfig(
         site=_parse_site(raw["site"]), crawl=_parse_crawl(raw["crawl"]),
@@ -241,8 +195,6 @@ def load_config(config_path: str | Path = DEFAULT_CONFIG,
         fingerprint=config_fingerprint(config, selectors),
         config_path=str(path.resolve()), selectors_path=str(selector_file.resolve()),
     )
-
-
 def with_fixed_clock(loaded: LoadedConfig, fixed_at: str | None) -> LoadedConfig:
     config = replace(loaded.config, clock=ClockConfig(fixed_at=fixed_at))
     return replace(loaded, config=config, fingerprint=config_fingerprint(config, loaded.selectors))

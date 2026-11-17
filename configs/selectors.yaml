@@ -7,7 +7,6 @@ list:
   location: "span.job-location"
   salary: "span.job-salary"
   next_page: "a.next-page"
-
 detail:
   title: "h1.job-title"
   company: ".company-name"

@@ -1,11 +1,8 @@
 """Collection orchestration: crawl, persist raw evidence, apply lifecycle."""
-
 from __future__ import annotations
-
 import re
 from dataclasses import dataclass
 from typing import Any
-
 from .clock import Clock, clock_from_config, iso_z, timestamp_slug
 from .config import LoadedConfig
 from .crawler import CrawlResult, Crawler, failure_payload
@@ -14,10 +11,7 @@ from .http_client import HttpClient
 from .lifecycle import LifecycleEngine, LifecycleResult
 from .rawstore import RawStore
 from .store import Store
-
 _SAFE_ID = re.compile(r"[^a-zA-Z0-9_.-]+")
-
-
 @dataclass
 class CollectionOutcome:
     run_id: str
@@ -25,14 +19,11 @@ class CollectionOutcome:
     result: CrawlResult
     lifecycle: LifecycleResult
     run: dict[str, Any] | None
-
     def summary(self) -> dict[str, Any]:
         payload = self.result.summary()
         payload["scenario"] = self.scenario
         payload["lifecycle"] = self.lifecycle.summary()
         return payload
-
-
 def choose_run_id(
     clock: Clock,
     *,
@@ -40,13 +31,10 @@ def choose_run_id(
     config_hash: str,
     explicit: str | None = None,
 ) -> str:
-    if explicit:
-        return explicit
+    if explicit: return explicit
     stamp = timestamp_slug(clock.now())
     safe_scenario = _SAFE_ID.sub("-", scenario)
     return f"run-{stamp}-{safe_scenario}-{config_hash[:8]}"
-
-
 def run_collection(
     loaded: LoadedConfig,
     *,
@@ -77,8 +65,7 @@ def run_collection(
         except Exception as exc:
             finished = iso_z(active_clock.now())
             notes = {"error_type": type(exc).__name__, "error": str(exc)}
-            if store.run_is_finished(identifier):
-                notes["replay_of_finished_run"] = True
+            if store.run_is_finished(identifier): notes["replay_of_finished_run"] = True
             try:
                 store.finish_run(identifier, status="failed", is_complete=False,
                                  finished_at=finished, stop_reason="exception",
@@ -86,8 +73,7 @@ def run_collection(
             except StorageError:
                 pass
             raise
-        for document in result.documents:
-            store.record_raw_document(document)
+        for document in result.documents: store.record_raw_document(document)
         lifecycle = LifecycleEngine(store).apply(
             run_id=identifier, site_key=config.site.name,
             observations=result.observations, complete=result.complete,
@@ -114,4 +100,3 @@ def run_collection(
     finally:
         client.close()
         store.close()
-

@@ -20,13 +20,10 @@
   <tr><th>内容哈希</th><td><code>{{ job.content_hash }}</code></td></tr>
   <tr><th>原始链接</th><td><code>{{ job.detail_url }}</code></td></tr>
 </table>
-
 <h2>标签</h2>
 <ul class="tags">{% for tag in job.tags %}<li>{{ tag }}</li>{% endfor %}</ul>
-
 <h2>描述</h2>
 <p>{{ job.description }}</p>
-
 <h2>事件时间线</h2>
 {% if events %}
 <table>
@@ -38,7 +35,6 @@
   </tbody>
 </table>
 {% else %}<p class="muted">暂无事件。</p>{% endif %}
-
 <h2>快照</h2>
 {% if snapshots %}
 <table>

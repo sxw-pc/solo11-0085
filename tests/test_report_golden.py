@@ -1,31 +1,21 @@
 """Golden report summary/events, deterministic Markdown, and exports."""
-
 from __future__ import annotations
-
 import csv
 import json
 from pathlib import Path
-
 from jobtrace.clock import FixedClock, parse_instant
 from jobtrace.report import build_report, write_reports
 from jobtrace.store import Store
-
 GOLDEN = Path(__file__).resolve().parents[1] / "fixtures" / "expected" / "day2_report.json"
-
-
 def test_day2_report_matches_golden_and_is_deterministic(collect):
     _, _ = collect("baseline", run_id="run-1", fixed_at="2026-01-15T09:00:00Z")
-    loaded, outcome = collect(
-        "day2", run_id="run-2", fixed_at="2026-01-16T09:00:00Z"
-    )
+    loaded, outcome = collect("day2", run_id="run-2", fixed_at="2026-01-16T09:00:00Z")
     assert outcome.result.complete is True
     clock = FixedClock(parse_instant("2026-01-16T09:00:00Z"))
     store = Store(loaded.config.storage.database, readonly=True)
     try:
         report = build_report(store, clock, "jobtrace-demo")
-        paths = write_reports(
-            store, loaded.config.storage.report_dir, clock, "jobtrace-demo"
-        )
+        paths = write_reports(store, loaded.config.storage.report_dir, clock, "jobtrace-demo")
         first_markdown = Path(paths["markdown"]).read_bytes()
         write_reports(store, loaded.config.storage.report_dir, clock, "jobtrace-demo")
     finally:
@@ -53,7 +43,6 @@ def test_day2_report_matches_golden_and_is_deterministic(collect):
         for event in report["events"]
     ]
     assert simplified == golden["events"]
-
     markdown_path = Path(paths["markdown"])
     json_path = Path(paths["json"])
     csv_path = Path(paths["csv"])

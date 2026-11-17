@@ -1,15 +1,10 @@
 """Shared domain value objects."""
-
 from __future__ import annotations
-
 from dataclasses import dataclass, field
 from typing import Any
-
 from .fingerprint import content_hash
 from .normalize import Experience
 from .salary import SalaryInfo
-
-
 @dataclass(frozen=True)
 class ListItem:
     external_id: str
@@ -19,8 +14,6 @@ class ListItem:
     salary: str
     detail_url: str
     issues: tuple[str, ...] = ()
-
-
 @dataclass(frozen=True)
 class JobObservation:
     site_key: str
@@ -39,7 +32,9 @@ class JobObservation:
     posted_at: str | None = None
     source_status: str | None = None
     issues: tuple[str, ...] = field(default_factory=tuple)
-
+    # Derived requirement parse; intentionally outside content_payload() so the
+    # raw description and its content_hash stay untouched by ruleset versions.
+    requirement_parse: object | None = None
     def content_payload(self) -> dict[str, Any]:
         return {
             "external_id": self.external_id, "title": self.title, "company": self.company,
@@ -55,11 +50,8 @@ class JobObservation:
             "tags": list(self.tags), "detail_url": self.detail_url,
             "posted_at": self.posted_at, "source_status": self.source_status,
         }
-
     @property
-    def content_hash(self) -> str:
-        return content_hash(self.content_payload())
-
+    def content_hash(self) -> str: return content_hash(self.content_payload())
     def tracked_values(self) -> dict[str, str]:
         tags = "、".join(self.tags)
         return {"title": self.title, "company": self.company,

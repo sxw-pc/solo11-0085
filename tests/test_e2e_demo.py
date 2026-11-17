@@ -1,13 +1,8 @@
 """End-to-end one-shot demo through the real CLI and loopback servers."""
-
 from __future__ import annotations
-
 from pathlib import Path
-
 from jobtrace.cli import main
 from jobtrace.store import Store
-
-
 def test_demo_no_serve_runs_collection_and_writes_reports(tmp_path, capsys):
     database = tmp_path / "demo.sqlite3"
     report_dir = tmp_path / "reports"

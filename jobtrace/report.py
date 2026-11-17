@@ -1,17 +1,13 @@
 """Deterministic Markdown/JSON reports and CSV/JSONL exports."""
-
 from __future__ import annotations
-
 import csv
 import io
 import json
 from pathlib import Path
 from typing import Any
-
 from .clock import Clock, iso_z, parse_instant
 from .fingerprint import canonical_json
 from .store import Store
-
 EVENT_TYPES = ("NEW", "CHANGED", "DISAPPEARED", "CLOSED", "REOPENED")
 CSV_COLUMNS = (
     "external_id", "title", "company", "location_raw", "city", "district",
@@ -19,25 +15,18 @@ CSV_COLUMNS = (
     "employment_type", "status", "missing_streak", "first_seen_at", "last_seen_at",
     "closed_at", "detail_url",
 )
-
-
 def _timestamp(value: str | None) -> str | None:
-    if not value:
-        return None
+    if not value: return None
     try:
         return iso_z(parse_instant(value))
     except Exception:
         return value
-
-
 def _tags(row: dict[str, Any]) -> list[str]:
     try:
         value = json.loads(row.get("tags_json") or "[]")
         return value if isinstance(value, list) else []
     except (TypeError, json.JSONDecodeError):
         return []
-
-
 def _job_payload(row: dict[str, Any]) -> dict[str, Any]:
     return {
         "job_uid": row["job_uid"], "external_id": row["external_id"],
@@ -58,8 +47,6 @@ def _job_payload(row: dict[str, Any]) -> dict[str, Any]:
         "closed_at": _timestamp(row["closed_at"]),
         "content_hash": row["content_hash"], "detail_url": row["detail_url"],
     }
-
-
 def _run_payload(run: dict[str, Any]) -> dict[str, Any]:
     return {
         "run_id": run["run_id"], "scenario": run["scenario"],
@@ -73,8 +60,6 @@ def _run_payload(run: dict[str, Any]) -> dict[str, Any]:
         "parse_warnings": run["parse_warnings"], "resumed": bool(run["resumed"]),
         "stop_reason": run["stop_reason"], "config_hash": run["config_hash"],
     }
-
-
 def _event_payload(row: dict[str, Any]) -> dict[str, Any]:
     return {
         "event_type": row["event_type"], "field": row["field"],
@@ -83,8 +68,6 @@ def _event_payload(row: dict[str, Any]) -> dict[str, Any]:
         "external_id": row["external_id"], "title": row["title"],
         "company": row["company"],
     }
-
-
 def build_report(store: Store, clock: Clock, site_key: str | None = None) -> dict[str, Any]:
     latest = store.latest_run(site_key)
     selected_site = site_key or (latest["site_key"] if latest else "")
@@ -121,12 +104,8 @@ def build_report(store: Store, clock: Clock, site_key: str | None = None) -> dic
         "latest_run": latest_payload, "runs": runs, "jobs": jobs, "events": events,
         "raw_evidence": {"documents_in_latest_run": raw_count},
     }
-
-
 def _cell(value: Any) -> str:
     return str(value if value is not None else "").replace("|", "\\|").replace("\n", " ")
-
-
 def render_markdown(report: dict[str, Any]) -> str:
     summary, latest = report["summary"], report["latest_run"]
     lines = [
@@ -177,16 +156,10 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
     ])
     return "\n".join(lines)
-
-
 def _csv_value(value: Any) -> Any:
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, list):
-        return "、".join(str(item) for item in value)
+    if isinstance(value, bool): return "true" if value else "false"
+    if isinstance(value, list): return "、".join(str(item) for item in value)
     return "" if value is None else value
-
-
 def write_reports(
     store: Store, output_dir: str | Path, clock: Clock, site_key: str | None = None
 ) -> dict[str, str]:

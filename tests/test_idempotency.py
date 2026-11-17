@@ -1,10 +1,6 @@
 """Idempotent upserts, stable identities, and duplicate listing protection."""
-
 from __future__ import annotations
-
 from jobtrace.store import Store
-
-
 def test_repeated_baseline_is_idempotent(collect):
     loaded, first = collect("baseline", run_id="run-1")
     _, second = collect("baseline", run_id="run-2")
@@ -25,8 +21,6 @@ def test_repeated_baseline_is_idempotent(collect):
         assert store.scalar("SELECT COUNT(DISTINCT job_uid) FROM jobs") == 64
     finally:
         store.close()
-
-
 def test_duplicate_listing_id_creates_one_job(collect):
     loaded, outcome = collect("day2", run_id="run-day2")
     assert outcome.result.list_cards == 65
@@ -38,8 +32,6 @@ def test_duplicate_listing_id_creates_one_job(collect):
         assert len(jobs) == 64
         assert len({job["external_id"] for job in jobs}) == 64
         assert store.find_job("jobtrace-demo", "JT-0065") is not None
-        assert store.scalar(
-            "SELECT COUNT(*) FROM jobs WHERE external_id = 'JT-0065'"
-        ) == 1
+        assert store.scalar("SELECT COUNT(*) FROM jobs WHERE external_id = 'JT-0065'") == 1
     finally:
         store.close()

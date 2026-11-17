@@ -1,14 +1,8 @@
 """The repository must stay inside its declared source line budget."""
-
 from __future__ import annotations
-
 from pathlib import Path
-
 from jobtrace.lint_size import check
-
 ROOT = Path(__file__).resolve().parents[1]
-
-
 def test_line_budget_and_per_file_limit():
     report = check(ROOT)
     assert 2500 <= report.total <= 4500

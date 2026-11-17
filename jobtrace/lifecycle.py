@@ -1,16 +1,12 @@
 """Lifecycle event calculation for the job ledger."""
-
 from __future__ import annotations
-
 import json
 from dataclasses import dataclass, field
 from typing import Any
-
 from .fingerprint import TRACKED_FIELDS, canonical_json, job_uid
+from .impact import compare_requirements
 from .models import JobObservation
 from .store import Store
-
-
 @dataclass
 class LifecycleResult:
     new_jobs: int = 0
@@ -22,7 +18,9 @@ class LifecycleResult:
     skipped: bool = False
     changed_fields: dict[str, int] = field(default_factory=dict)
     events: list[dict[str, Any]] = field(default_factory=list)
-
+    # Derived-only evidence: description requirement impact. Never emits events
+    # and never mutates content_hash; the raw descriptions stay in snapshots.
+    requirement_impacts: list[dict[str, Any]] = field(default_factory=list)
     def summary(self) -> dict[str, Any]:
         return {
             "new_jobs": self.new_jobs, "changed_events": self.changed_events,
@@ -31,8 +29,6 @@ class LifecycleResult:
             "skipped": self.skipped,
             "changed_fields": dict(sorted(self.changed_fields.items())),
         }
-
-
 def _event(conn: Any, *, job_uid_value: str, run_id: str, event_type: str,
            field_name: str, old: Any, new: Any, created_at: str) -> bool:
     cursor = conn.execute(
@@ -43,8 +39,6 @@ def _event(conn: Any, *, job_uid_value: str, run_id: str, event_type: str,
          None if old is None else str(old), None if new is None else str(new), created_at),
     )
     return cursor.rowcount == 1
-
-
 def _row_tracked(row: dict[str, Any]) -> dict[str, str]:
     try:
         tags = "、".join(json.loads(row.get("tags_json") or "[]"))
@@ -56,8 +50,6 @@ def _row_tracked(row: dict[str, Any]) -> dict[str, str]:
         "experience": row.get("experience_text") or "",
         "employment_type": row.get("employment_type") or "", "tags": tags,
     }
-
-
 def _observation_values(observation: JobObservation) -> tuple[Any, ...]:
     salary = observation.salary
     return (
@@ -70,8 +62,6 @@ def _observation_values(observation: JobObservation) -> tuple[Any, ...]:
         observation.description, json.dumps(list(observation.tags), ensure_ascii=False),
         observation.detail_url, observation.posted_at, observation.source_status,
     )
-
-
 _JOB_COLUMNS = """
     external_id, title, company, location_raw, city, district,
     salary_min, salary_max, salary_text, salary_currency, salary_period,
@@ -80,16 +70,11 @@ _JOB_COLUMNS = """
     posted_at, source_status, content_hash
 """
 _JOB_PLACEHOLDERS = ", ".join("?" for _ in range(23))
-
-
 class LifecycleEngine:
-    def __init__(self, store: Store):
-        self.store = store
-
+    def __init__(self, store: Store): self.store = store
     def apply(self, *, run_id: str, site_key: str, observations: list[JobObservation],
               complete: bool, now: str, close_after_missing_runs: int) -> LifecycleResult:
-        if self.store.run_is_finished(run_id):
-            return LifecycleResult(skipped=True)
+        if self.store.run_is_finished(run_id): return LifecycleResult(skipped=True)
         result = LifecycleResult()
         unique: dict[str, JobObservation] = {}
         for observation in observations:
@@ -138,8 +123,10 @@ class LifecycleEngine:
                             result.changed_events += 1
                             key = result.changed_fields
                             key[field_name] = key.get(field_name, 0) + 1
-                    if not changed and not reopened:
-                        result.unchanged += 1
+                    if not changed and not reopened: result.unchanged += 1
+                    if row.get("description", "") != observation.description:
+                        result.requirement_impacts.append(
+                            self._requirement_impact(uid, row, observation, run_id, now))
                     _update_job(conn, uid, run_id, now, digest, values)
                 self._snapshot(conn, uid, run_id, digest, payload_json, now)
             if complete:
@@ -149,7 +136,6 @@ class LifecycleEngine:
                 or result.closed or result.reopened):
             result.events = self.store.list_events(run_id=run_id, limit=10000)
         return result
-
     def _snapshot(self, conn: Any, uid: str, run_id: str, digest: str,
                   payload_json: str, now: str) -> None:
         conn.execute(
@@ -158,13 +144,20 @@ class LifecycleEngine:
             ) VALUES (?, ?, ?, ?, ?)""",
             (uid, run_id, digest, payload_json, now),
         )
-
+    def _requirement_impact(self, uid: str, row: dict[str, Any],
+                            observation: JobObservation, run_id: str,
+                            now: str) -> dict[str, Any]:
+        # Recomputed from raw text only; ruleset version changes never rewrite
+        # the persisted description, content_hash, or lifecycle events.
+        comparison = compare_requirements(row.get("description") or "", observation.description)
+        return {"job_uid": uid, "external_id": observation.external_id, "run_id": run_id,
+                "observed_at": now, "old_run_id": row.get("last_seen_run_id"),
+                "text_revised": True, "impact": comparison.as_dict()}
     def _handle_missing(self, conn: Any, *, rows: list[Any], observed: set[str],
                         run_id: str, now: str, threshold: int, result: LifecycleResult) -> None:
         for raw_row in rows:
             row = dict(raw_row)
-            if row["external_id"] in observed or row["status"] != "open":
-                continue
+            if row["external_id"] in observed or row["status"] != "open": continue
             streak = int(row["missing_streak"]) + 1
             if _event(conn, job_uid_value=row["job_uid"], run_id=run_id,
                       event_type="DISAPPEARED", field_name="presence", old="seen",
@@ -182,8 +175,6 @@ class LifecycleEngine:
                 WHERE job_uid = ?""",
                 (streak, status, closed_at, now, row["job_uid"]),
             )
-
-
 def _insert_job(conn: Any, uid: str, site_key: str, run_id: str, now: str,
                 digest: str, values: tuple[Any, ...]) -> None:
     conn.execute(
@@ -193,8 +184,6 @@ def _insert_job(conn: Any, uid: str, site_key: str, run_id: str, now: str,
         ) VALUES (?, ?, {_JOB_PLACEHOLDERS}, 'open', 0, ?, ?, ?, ?, ?)""",
         (uid, site_key, *values, digest, run_id, now, run_id, now, now),
     )
-
-
 def _update_job(conn: Any, uid: str, run_id: str, now: str, digest: str,
                 values: tuple[Any, ...]) -> None:
     columns = [part.strip() for part in _JOB_COLUMNS.strip().split(",")]

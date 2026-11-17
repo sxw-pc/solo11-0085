@@ -1,36 +1,26 @@
 """New/change/disappear/close/reopen lifecycle semantics."""
-
 from __future__ import annotations
-
 from jobtrace.store import Store
-
-
 def _job(store: Store, external_id: str) -> dict:
     job = store.find_job("jobtrace-demo", external_id)
     assert job is not None
     return job
-
-
 def test_full_lifecycle_and_reopen(collect):
     loaded, baseline = collect("baseline", run_id="run-baseline")
     assert baseline.lifecycle.new_jobs == 64
-
     _, day2 = collect("day2", run_id="run-day2")
     assert day2.lifecycle.new_jobs == 2
     assert day2.lifecycle.changed_events == 3
     assert day2.lifecycle.changed_fields == {"location": 1, "salary": 1, "title": 1}
     assert day2.lifecycle.disappeared == 2
     assert day2.lifecycle.closed == 0
-
     _, day2_again = collect("day2", run_id="run-day2-again")
     assert day2_again.lifecycle.closed == 2
     assert day2_again.lifecycle.disappeared == 2
-
     _, reopened_run = collect("baseline", run_id="run-baseline-again")
     assert reopened_run.lifecycle.reopened == 2
     assert reopened_run.lifecycle.changed_events == 3
     assert reopened_run.lifecycle.disappeared == 2
-
     store = Store(loaded.config.storage.database)
     try:
         ledger = store.ledger_counts("jobtrace-demo")
@@ -56,8 +46,6 @@ def test_full_lifecycle_and_reopen(collect):
         assert salary_event["old_value"] != salary_event["new_value"]
     finally:
         store.close()
-
-
 def test_incomplete_run_never_closes_or_marks_missing(collect):
     loaded, baseline = collect("baseline", run_id="run-baseline")
     assert baseline.result.complete is True
