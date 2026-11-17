@@ -29,7 +29,11 @@
 | `crawler.py` | 列表/详情编排、重复 ID 去重、故障隔离、完整运行判定 |
 | `parser.py` | CSS 选择器解析、缺失统计、畸形卡片隔离 |
 | `normalize.py` | 空白/NFKC、地点、经验、雇佣类型、标签清洗 |
-| `salary.py` | 中文薪资表达式转月薪 CNY |
+| `salary.py` | 中文薪资表达式转月薪 CNY（台账展示口径，保持不变） |
+| `comp_parser.py` | 文档化中文薪酬语法解析，保留原文与每个数字的来源 span |
+| `compensation.py` | Fraction 精确有理数约束求解、可行年度收入集合与冲突报告 |
+| `comparison.py` | 稳健优势/机会优势两种跨岗位比较合同与数值见证 |
+| `comp_report.py` | 基于 Store 只读数据的薪酬解释与比较查询、Markdown 渲染 |
 | `fingerprint.py` | 岗位 UID、内容哈希、配置哈希 |
 | `rawstore.py` | SHA-256 内容寻址对象与追加式 manifest |
 | `store.py` | SQLite schema、事务、幂等写入、查询 |

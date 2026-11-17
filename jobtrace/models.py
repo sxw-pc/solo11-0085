@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from .compensation import CompensationPlan
 from .fingerprint import content_hash
 from .normalize import Experience
 from .salary import SalaryInfo
@@ -39,6 +40,10 @@ class JobObservation:
     posted_at: str | None = None
     source_status: str | None = None
     issues: tuple[str, ...] = field(default_factory=tuple)
+    # Offline constraint-level view of the same raw salary text. Deliberately
+    # excluded from content_payload()/tracked_values() so lifecycle events and
+    # content hashes are unchanged.
+    compensation: CompensationPlan | None = None
 
     def content_payload(self) -> dict[str, Any]:
         return {

@@ -117,3 +117,12 @@ JSON 报告的 key 排序稳定；CSV 固定 18 列；JSONL 每行一个事件�
 ## 只读访问
 
 复核台每次请求只读打开数据库，不共享长连接。数据库缺失返回 HTTP 503；岗位不存在返回 404；所有写方法（POST/PUT/PATCH/DELETE）由 Flask 返回 405。
+
+## 薪酬约束层（不入库、不改事件）
+
+`JobObservation.compensation` 是内存中的 `CompensationPlan`，由详情页薪酬原文经
+`comp_parser` 解析得到。它**不进入** `content_payload()`/`tracked_values()`，因此
+jobs 表结构、content hash 与全部生命周期事件均与旧链路完全一致；`comp_report`
+只通过只读 Store 方法读取 jobs 行与 `job_snapshots.payload_json` 中的薪酬原文，
+用 Fraction 重新求解可行年度收入集合，绝不基于 `salary_min/salary_max` 排序。
+语法、求解规则与两种比较合同见 [COMPENSATION.md](COMPENSATION.md)。

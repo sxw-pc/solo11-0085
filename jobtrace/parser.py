@@ -8,6 +8,7 @@ from urllib.parse import urljoin, urlsplit
 
 from bs4 import BeautifulSoup, Tag
 
+from .compensation import CompensationError, parse_compensation
 from .models import JobObservation, ListItem
 from .normalize import (
     clean_text, normalize_employment_type, normalize_experience,
@@ -149,6 +150,10 @@ def parse_detail_page(html: str, page_url: str, site_key: str,
     salary = parse_salary(salary_raw)
     if salary_raw and not salary.valid:
         issues.append(f"invalid salary expression: {salary_raw}")
+    try:
+        compensation = parse_compensation(salary_raw) if salary_raw else None
+    except CompensationError:
+        compensation = None
     location = normalize_location(location_raw)
     observation = JobObservation(
         site_key=site_key, external_id=item.external_id, title=title, company=company,
@@ -158,7 +163,7 @@ def parse_detail_page(html: str, page_url: str, site_key: str,
         description=description,
         tags=normalize_tags([node.get_text(" ", strip=True) for node in tag_nodes]),
         detail_url=page_url, posted_at=posted_at or None, source_status=status or None,
-        issues=tuple(issues),
+        issues=tuple(issues), compensation=compensation,
     )
     return DetailResult(observation=observation, issues=tuple(issues), selector_misses=misses)
 

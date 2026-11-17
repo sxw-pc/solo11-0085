@@ -94,6 +94,7 @@ python -m jobtrace serve-review --db var/jobtrace.sqlite3 --port 8766
 - **生命周期**：事件为 `NEW`、`CHANGED`、`DISAPPEARED`、`CLOSED`、`REOPENED`；连续缺失达到阈值才关闭；不完整运行绝不标记消失或关闭。
 - **可恢复翻页**：检查点保存下一页 URL、已访问页与完成状态；`--resume` 可从游标继续，并把本次运行标为不完整。
 - **确定性**：时钟、端口、运行 ID 均可注入/固定；报告时间规范化到秒；测试使用固定时钟与隔离临时目录。
+- **薪酬约束解释**：月薪区间、12-24 薪、固定/目标奖金、含上述各项的年包总额按文档化语法解析，用 Fraction 精确有理数求可行年度收入集合；年包取交集而非相加，无解时报告冲突的两项约束，“上不封顶”保留无穷上界，混币种拒绝比较；稳健/机会两种比较合同均带数值见证，且不改变任何生命周期事件。
 - **只读复核台**：仅提供 GET 查询与健康检查，POST 返回 405；数据库缺失时返回 503。
 
 ## 目录
@@ -105,8 +106,8 @@ jobtrace/            采集、解析、存储、生命周期、报告、CLI
 configs/             默认配置与选择器
 fixtures/scenarios/  5 个合成场景
 fixtures/expected/   golden 期望
-tests/               11 个测试文件，包含端到端与行数预算测试
-docs/                设计、配置、数据模型、生命周期、合规、运行手册
+tests/               13 个测试文件，包含端到端与行数预算测试
+docs/                设计、配置、数据模型、生命周期、合规、运行手册、薪酬约束语法
 ```
 
 ## 测试与规模
@@ -116,9 +117,9 @@ make test
 make lint-size
 ```
 
-测试覆盖配置与 URL 防护、薪资解析、列表/详情解析、翻页循环、幂等、完整生命周期、原始证据、报告 golden、端到端 demo 与代码行数预算。
+测试覆盖配置与 URL 防护、薪资解析、薪酬约束可行集与两种比较合同、列表/详情解析、翻页循环、幂等、完整生命周期、原始证据、报告 golden、端到端 demo 与代码行数预算。
 
-行数口径：`lint-size` 统计 `.py`、`.html`、`.yaml` 这类代码/配置源文件（含测试），要求总量 2500–4500 行；`.md` 文档不计入总代码量，但所有 `.py`、`.html`、`.yaml`、`.md` 文件均受单文件 300 行上限约束。
+行数口径：`lint-size` 统计 `.py`、`.html`、`.yaml` 这类代码/配置源文件（含测试），要求总量 2500–6500 行；`.md` 文档不计入总代码量，但所有 `.py`、`.html`、`.yaml`、`.md` 文件均受单文件 300 行上限约束。
 
 ## 边界
 
@@ -136,6 +137,7 @@ make lint-size
 - [docs/DESIGN.md](docs/DESIGN.md)
 - [docs/CONFIG.md](docs/CONFIG.md)
 - [docs/DATA_MODEL.md](docs/DATA_MODEL.md)
+- [docs/COMPENSATION.md](docs/COMPENSATION.md)
 - [docs/LIFECYCLE.md](docs/LIFECYCLE.md)
 - [docs/COMPLIANCE.md](docs/COMPLIANCE.md)
 - [docs/RUNBOOK.md](docs/RUNBOOK.md)

@@ -11,6 +11,10 @@ from typing import Any
 from .clock import Clock, iso_z, parse_instant
 from .fingerprint import canonical_json
 from .store import Store
+from .comp_report import (  # noqa: F401  (read-only query entry points live here)
+    compare_jobs, explain_store, render_comparison_markdown,
+    render_compensation_markdown,
+)
 
 EVENT_TYPES = ("NEW", "CHANGED", "DISAPPEARED", "CLOSED", "REOPENED")
 CSV_COLUMNS = (
