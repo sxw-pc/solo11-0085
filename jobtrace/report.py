@@ -2,23 +2,29 @@
 
 from __future__ import annotations
 
-import csv
-import io
 import json
 from pathlib import Path
 from typing import Any
 
 from .clock import Clock, iso_z, parse_instant
-from .fingerprint import canonical_json
+from .exporters import (
+    CSV_COLUMNS,
+    EVENT_TYPES,
+    EXPORT_COLUMNS,
+    render_bundle,
+    render_csv,
+    render_json,
+    render_jsonl,
+    render_markdown,
+)
+from .fingerprint import canonical_json, sha256_text
 from .store import Store
 
-EVENT_TYPES = ("NEW", "CHANGED", "DISAPPEARED", "CLOSED", "REOPENED")
-CSV_COLUMNS = (
-    "external_id", "title", "company", "location_raw", "city", "district",
-    "salary_text", "salary_min", "salary_max", "salary_months", "experience_text",
-    "employment_type", "status", "missing_streak", "first_seen_at", "last_seen_at",
-    "closed_at", "detail_url",
-)
+__all__ = [
+    "CSV_COLUMNS", "EVENT_TYPES", "EXPORT_COLUMNS", "build_report",
+    "compute_identity", "identity_payload", "render_bundle", "render_csv",
+    "render_json", "render_jsonl", "render_markdown", "write_reports",
+]
 
 
 def _timestamp(value: str | None) -> str | None:
@@ -85,17 +91,64 @@ def _event_payload(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def build_report(store: Store, clock: Clock, site_key: str | None = None) -> dict[str, Any]:
-    latest = store.latest_run(site_key)
-    selected_site = site_key or (latest["site_key"] if latest else "")
-    ledger = store.ledger_counts(selected_site)
-    runs = [_run_payload(run) for run in store.list_runs(selected_site, limit=20)]
-    jobs = [_job_payload(row) for row in store.list_jobs(site_key=selected_site, limit=10000)]
-    events: list[dict[str, Any]] = []
-    counts = {name: 0 for name in EVENT_TYPES}
-    if latest:
-        counts = store.event_counts(latest["run_id"])
-        events = [_event_payload(row) for row in store.list_events(run_id=latest["run_id"], limit=10000)]
+def _run_evidence(store: Store, run: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    evidence = dict(run)
+    evidence["rowid"] = store.scalar(
+        "SELECT rowid FROM runs WHERE run_id = ?", (run["run_id"],)
+    )
+    return evidence, sha256_text(canonical_json(evidence))
+
+
+def identity_payload(report: dict[str, Any]) -> dict[str, Any]:
+    """The canonical observation version shared by all four formats."""
+
+    summary, bundle = report["summary"], report.get("bundle", {})
+    return {
+        "schema_version": 1, "site_key": report["site_key"],
+        "run_id": summary["run_id"], "run_started_at": summary["run_started_at"],
+        "run_finished_at": summary["run_finished_at"],
+        "run_complete": summary["run_complete"],
+        "run_evidence_digest": bundle.get("run_evidence_digest"),
+        "jobs_total": summary["jobs_total"], "jobs_open": summary["jobs_open"],
+        "jobs_closed": summary["jobs_closed"],
+        "event_counts": summary["event_counts"],
+        "jobs": report["jobs"], "events": report["events"],
+    }
+
+
+def compute_identity(report: dict[str, Any]) -> tuple[str, str]:
+    digest = sha256_text(canonical_json(identity_payload(report)))
+    return "bundle-" + digest[:24], digest
+
+
+def build_report(store: Store, clock: Clock, site_key: str | None = None,
+                 *, run_id: str | None = None) -> dict[str, Any]:
+    """Build one report from a single pinned SQLite read view.
+
+    Every query, including the run selection, ledger counts, jobs and events,
+    observes the same commit point, so a concurrent R2 can never leak R2 jobs
+    into a report labelled R1.
+    """
+
+    with store.read_snapshot():
+        latest = (store.get_run(run_id) if run_id
+                  else store.latest_finished_run(site_key))
+        selected_site = site_key or (latest["site_key"] if latest else "")
+        ledger = store.ledger_counts(selected_site)
+        runs = [_run_payload(run) for run in store.list_runs(selected_site, limit=20)]
+        jobs = [_job_payload(row) for row in store.list_jobs(site_key=selected_site, limit=10000)]
+        events: list[dict[str, Any]] = []
+        counts = {name: 0 for name in EVENT_TYPES}
+        evidence: dict[str, Any] | None = None
+        evidence_digest: str | None = None
+        raw_count = 0
+        if latest:
+            counts = store.event_counts(latest["run_id"])
+            events = [_event_payload(row)
+                      for row in store.list_events(run_id=latest["run_id"], limit=10000)]
+            evidence, evidence_digest = _run_evidence(store, latest)
+            raw_count = len(store.raw_documents_for_run(latest["run_id"]))
+        jobs_digest = sha256_text(canonical_json(jobs))
     summary = {
         "site_key": selected_site, "jobs_total": ledger["total"],
         "jobs_open": ledger.get("open", 0), "jobs_closed": ledger.get("closed", 0),
@@ -114,100 +167,37 @@ def build_report(store: Store, clock: Clock, site_key: str | None = None) -> dic
             {key: notes.get(key, {} if key == "selector_misses" else [])
              for key in ("lifecycle", "failures", "warnings", "selector_misses")}
         )
-    raw_count = len(store.raw_documents_for_run(latest["run_id"])) if latest else 0
-    return {
+    report = {
         "schema_version": 1, "generated_at": iso_z(clock.now()),
         "site_key": selected_site, "summary": summary,
         "latest_run": latest_payload, "runs": runs, "jobs": jobs, "events": events,
         "raw_evidence": {"documents_in_latest_run": raw_count},
+        "bundle": {
+            "schema_version": 1, "run_id": summary["run_id"],
+            "run_started_at": summary["run_started_at"],
+            "run_finished_at": summary["run_finished_at"],
+            "run_complete": summary["run_complete"],
+            "observation_complete": summary["run_complete"],
+            "observation_scope": "complete" if summary["run_complete"] else "incomplete",
+            "run_evidence_digest": evidence_digest,
+            "run_evidence": evidence, "jobs_digest": jobs_digest,
+            "jobs_count": len(jobs), "events_count": len(events),
+            "ledger_counts": dict(ledger), "raw_count": raw_count,
+            "bundle_id": None, "content_digest": None,
+        },
     }
-
-
-def _cell(value: Any) -> str:
-    return str(value if value is not None else "").replace("|", "\\|").replace("\n", " ")
-
-
-def render_markdown(report: dict[str, Any]) -> str:
-    summary, latest = report["summary"], report["latest_run"]
-    lines = [
-        "# 职迹采采集与生命周期报告", "",
-        "> 仅含仓库内置的合成岗位数据；不包含个人信息或外部网络内容。", "",
-        f"- 生成时间：`{report['generated_at']}`",
-        f"- 站点：`{summary['site_key'] or '(无)'}`",
-        f"- 台账岗位：{summary['jobs_total']}（开放 {summary['jobs_open']} / 关闭 {summary['jobs_closed']}）",
-    ]
-    if latest:
-        lines.extend([
-            f"- 最新运行：`{latest['run_id']}`（场景 `{latest['scenario']}`）",
-            f"- 运行状态：`{latest['status']}`，完整运行：`{str(latest['is_complete']).lower()}`",
-            f"- 列表页：{latest['pages_fetched']}，列表卡片：{latest['list_cards']}，"
-            f"详情成功：{latest['details_ok']}，详情失败：{latest['details_failed']}",
-        ])
-    counts = summary["event_counts"]
-    lines.extend(["", "## 生命周期事件计数", "", "| 事件 | 数量 |", "| --- | ---: |"])
-    lines.extend(f"| {name} | {counts.get(name, 0)} |" for name in EVENT_TYPES)
-    lines.extend(["", "## 最新运行事件", ""])
-    if report["events"]:
-        lines.extend(["| 类型 | 岗位 | 字段 | 旧值 | 新值 | 时间 |", "| --- | --- | --- | --- | --- | --- |"])
-        for event in report["events"]:
-            values = (
-                event["event_type"], _cell(f"{event['external_id']} {event['title']}"),
-                _cell(event["field"]), _cell(event["old_value"]), _cell(event["new_value"]),
-                event["created_at"],
-            )
-            lines.append("| {} | {} | {} | {} | {} | {} |".format(*values))
-    else:
-        lines.append("本次运行没有生命周期事件。")
-    lines.extend([
-        "", "## 岗位台账", "",
-        "| 编号 | 标题 | 公司 | 城市 | 薪资 | 状态 | 首次出现 | 最近出现 |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
-    ])
-    for job in report["jobs"]:
-        values = (
-            job["external_id"], _cell(job["title"]), _cell(job["company"]),
-            _cell(job["city"]), _cell(job["salary_text"]), job["status"],
-            job["first_seen_at"], job["last_seen_at"],
-        )
-        lines.append("| {} | {} | {} | {} | {} | {} | {} | {} |".format(*values))
-    lines.extend([
-        "", "## 证据与诊断", "",
-        f"- 原始响应文档数：{report['raw_evidence']['documents_in_latest_run']}",
-        f"- 选择器缺失统计：`{canonical_json(latest.get('selector_misses', {}) if latest else {})}`",
-        "",
-    ])
-    return "\n".join(lines)
-
-
-def _csv_value(value: Any) -> Any:
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, list):
-        return "、".join(str(item) for item in value)
-    return "" if value is None else value
+    bundle_id, digest = compute_identity(report)
+    report["bundle"]["bundle_id"] = bundle_id
+    report["bundle"]["content_digest"] = digest
+    return report
 
 
 def write_reports(
-    store: Store, output_dir: str | Path, clock: Clock, site_key: str | None = None
+    store: Store, output_dir: str | Path, clock: Clock, site_key: str | None = None,
+    *, run_id: str | None = None,
 ) -> dict[str, str]:
-    output = Path(output_dir)
-    output.mkdir(parents=True, exist_ok=True)
-    report = build_report(store, clock, site_key)
-    paths = {
-        "markdown": output / "report.md", "json": output / "report.json",
-        "csv": output / "jobs.csv", "jsonl": output / "events.jsonl",
-    }
-    paths["json"].write_text(
-        json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
-    paths["markdown"].write_text(render_markdown(report) + "\n", encoding="utf-8")
-    stream = io.StringIO(newline="")
-    writer = csv.DictWriter(stream, fieldnames=CSV_COLUMNS, lineterminator="\n")
-    writer.writeheader()
-    for job in report["jobs"]:
-        writer.writerow({key: _csv_value(job.get(key)) for key in CSV_COLUMNS})
-    paths["csv"].write_text(stream.getvalue(), encoding="utf-8", newline="")
-    with paths["jsonl"].open("w", encoding="utf-8", newline="\n") as handle:
-        for event in report["events"]:
-            handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
-    return {key: str(path.resolve()) for key, path in paths.items()}
+    """Publish one verified four-format bundle and return the bundle paths."""
+
+    from .publication import publish_report
+
+    return publish_report(store, output_dir, clock, site_key, run_id=run_id)["paths"]

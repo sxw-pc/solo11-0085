@@ -106,13 +106,27 @@ SQLite schema 见 `jobtrace/schema.py`，当前 `schema_version=1`。写库使�
 
 ## 报告投影
 
-`report.py` 从数据库中读取：
+`report.build_report()` 在一个 `Store.read_snapshot()`（`BEGIN` + 只读连接，WAL 快照隔离）内完成全部读取：
 
-- 最新 run、最近 20 次 run、最多 10000 个岗位与事件；
+- 通过 `run_id` 参数或 `latest_run(site_key)` 固定唯一的 run；
+- 最近 20 次 run、最多 10000 个岗位与事件；
 - 岗位台账与 open/closed 计数；
-- 最新 run 的事件计数与原始文档数。
+- 最新 run 的事件计数、原始文档数与 run 行证据（含 `rowid` 的规范化摘要）。
 
-JSON 报告的 key 排序稳定；CSV 固定 18 列；JSONL 每行一个事件。所有时间字段使用 `iso_z()` 规范化为秒级 UTC。
+因此一次报告不会出现“先读到 R1 的 run、后在另一查询中读到 R2 的 jobs”这种混合观察。`jobs` 与 `events` 行集绑定到同一个 `run_id` 与 `content_digest`；该摘要由 `identity_payload()` 对 run 身份、台账计数、完整 jobs 与 events 规范化计算。
+
+JSON 报告的 key 排序稳定；CSV 固定 18 列 + `bundle_id`、`content_digest` 两列；JSONL 每行一个事件并带相同身份字段（零事件时写一行 `_bundle` 身份记录）。所有时间字段使用 `iso_z()` 规范化为秒级 UTC。
+
+## 报告束与发布指针
+
+`jobtrace/bundle.py` 与 `jobtrace/publication.py` 管理报告产物：
+
+- `bundles/<bundle_id>/`：不可变报告束，内含四个格式与 `manifest.json`（每个文件的 SHA-256）。
+- `preview/<bundle_id>.json`：候选索引，记录 `completed_formats`、`missing_formats` 与失败原因；预览读取绝不经过已发布路径。
+- `current`：唯一的原子提交点，一个符号链接替换同时切换四个稳定路径。
+- `published.json`：派生的指针日志，记录 `run_started_at`、`run_rowid`、`content_digest`，用于“不同 run 不得倒退”的顺序检查与崩溃恢复。
+
+生成顺序：构建报告 → 渲染四格式 → 逐文件写入并核对摘要 → 校验整束 → 检查 run 证据仍与数据库一致 → 替换 `current` → 写指针日志。任何一步失败，已发布视图保持上一束不变；重试会复用已核验的束而不覆盖它。`recover()` 以 `current` 与文件摘要为准重写指针日志，残留临时文件不会被当作已完成格式。
 
 ## 只读访问
 

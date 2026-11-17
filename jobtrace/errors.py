@@ -52,5 +52,16 @@ class StorageError(JobTraceError):
     code = "storage_error"
 
 
+class ReportError(JobTraceError):
+    """Report generation/publication failure with a machine-readable status."""
+
+    code = "report_error"
+
+    def __init__(self, message: str, *, code: str = "report_error",
+                 details: dict | None = None):
+        super().__init__(message, details=details)
+        self.code = code
+
+
 class RawStoreError(JobTraceError):
     code = "rawstore_error"

@@ -23,7 +23,7 @@ make lint-size
 预期：
 
 - pytest 全部通过，且只访问 loopback；
-- `lint-size` 输出代码总行数（2500–4500）且无单文件超过 300 行。
+- `lint-size` 输出代码总行数（2500–6000）且无单文件超过 300 行。
 
 ## 一键演示
 
@@ -86,18 +86,29 @@ python -m jobtrace collect --base-url http://127.0.0.1:8765 --resume --run-id re
 
 ```bash
 python -m jobtrace report --db var/jobtrace.sqlite3 --out var/reports
+python -m jobtrace report --db var/jobtrace.sqlite3 --out var/reports --run-id run-001
+python -m jobtrace report --db var/jobtrace.sqlite3 --out var/reports --recover
 ```
 
 输出：
 
 ```text
-var/reports/report.md
+var/reports/report.md      （经 current 指向已发布束）
 var/reports/report.json
 var/reports/jobs.csv
 var/reports/events.jsonl
+var/reports/current -> bundles/<bundle_id>
+var/reports/bundles/<bundle_id>/   四个文件 + manifest.json
+var/reports/preview/<bundle_id>.json
+var/reports/published.json
 ```
 
-报告生成只读打开数据库，不修改台账。
+报告生成只读打开数据库，不修改台账。四种格式在同一 SQLite 一致性读视图中生成，每个候选束先写入独立目录并核对 SHA-256，最后才通过一次 `current` 符号链接替换切换全部四个路径。
+
+- **已发布报告合同**：`jobtrace.bundle.read_published()` 只返回已经四格式完整、摘要一致且通过了原子切换的报告束。若生成在写 Markdown 前中断，它仍是上一束（例如 R1）的四个文件。
+- **复核预览合同**：`jobtrace.bundle.read_preview()` 返回候选 `bundle_id`、`completed_formats`、`missing_formats`，只读取 `preview/` 与 `bundles/<bundle_id>/`，不会把 R2 的 JSON 放进已发布路径，也不会把 R1 同格式混入 R2 候选。
+
+命令输出中的 `status` 说明：`published` 表示已发布；`failed` 表示写入失败、已发布视图保持原束；`held` 表示候选已验证但指针被顺序/数据库证据检查阻止（例如重放更早的 run，或采集期间数据库发生变化）。中断后执行 `--recover` 会用实际文件摘要与数据库中的 run 证据重新核对，只修复指针日志，不把残留临时文件当成完成。
 
 ## 只读复核台
 

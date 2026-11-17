@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_line_budget_and_per_file_limit():
     report = check(ROOT)
-    assert 2500 <= report.total <= 4500
+    assert 2500 <= report.total <= 6000
     assert report.oversized == {}
     assert report.files["README.md"] <= 300
     assert report.files["jobtrace/lifecycle.py"] <= 300

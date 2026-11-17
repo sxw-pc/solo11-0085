@@ -76,6 +76,9 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("--db", help="SQLite database path override")
     report.add_argument("--out", help="report output directory override")
     report.add_argument("--site", help="site key to report")
+    report.add_argument("--run-id", default=None, help="pin the report to one run")
+    report.add_argument("--recover", action="store_true",
+                        help="verify the published pointer and index abandoned bundles")
     report.add_argument("--clock", help="fixed ISO-8601 clock, or 'system'")
 
     serve_mock = commands.add_parser("serve-mock", help="serve the synthetic site")

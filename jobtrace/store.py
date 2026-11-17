@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Self
 
 from .errors import StorageError
 from .fingerprint import canonical_json
@@ -49,11 +50,28 @@ class Store:
     def close(self) -> None:
         self.conn.close()
 
-    def __enter__(self) -> Store:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *_: object) -> None:
         self.close()
+
+    @contextmanager
+    def read_snapshot(self) -> Iterator[Self]:
+        """Pin one SQLite read view (WAL) for every query in the block."""
+
+        owned = not self.conn.in_transaction
+        if owned:
+            self.conn.execute("BEGIN")
+        try:
+            self.conn.execute("SELECT 1").fetchone()
+            yield self
+        finally:
+            if owned:
+                try:
+                    self.conn.execute("COMMIT")
+                except sqlite3.Error:
+                    self.conn.execute("ROLLBACK")
 
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
@@ -127,6 +145,18 @@ class Store:
         if site_key:
             sql, params = sql + " WHERE site_key = ?", (site_key,)
         row = self.conn.execute(sql + " ORDER BY started_at DESC, rowid DESC LIMIT 1", params).fetchone()
+        return dict(row) if row else None
+
+    def latest_finished_run(self, site_key: str | None = None) -> dict[str, Any] | None:
+        """Most recent run that has committed its finish, for stable reports."""
+
+        sql = "SELECT * FROM runs WHERE finished_at IS NOT NULL"
+        params: list[Any] = []
+        if site_key:
+            sql, params = sql + " AND site_key = ?", [site_key]
+        row = self.conn.execute(
+            sql + " ORDER BY started_at DESC, rowid DESC LIMIT 1", tuple(params)
+        ).fetchone()
         return dict(row) if row else None
 
     def list_runs(self, site_key: str | None = None, limit: int = 50) -> list[dict[str, Any]]:

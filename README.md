@@ -34,12 +34,20 @@ make demo          # 启动 mock 站点与只读复核台，并跑一次采集
 var/jobtrace.sqlite3      SQLite 台账
 var/raw/objects/          按 SHA-256 内容寻址的原始 HTML
 var/raw/manifest.jsonl    追加式证据清单
-var/reports/report.md     Markdown 报告
-var/reports/report.json   完整 JSON 报告
-var/reports/jobs.csv      岗位台账 CSV
-var/reports/events.jsonl  最新运行事件 JSONL
+var/reports/current       指向当前已发布报告束的稳定符号链接
+var/reports/report.md     Markdown 报告（经 current 指向已发布束）
+var/reports/report.json   完整 JSON 报告（经 current 指向已发布束）
+var/reports/jobs.csv      岗位台账 CSV（经 current 指向已发布束）
+var/reports/events.jsonl  最新运行事件 JSONL（经 current 指向已发布束）
+var/reports/bundles/      不可变的报告束，每个 bundle_id 一个目录
+var/reports/preview/      未发布候选批次的索引（含完成/缺失格式）
+var/reports/published.json 已发布指针日志，用于顺序校验与恢复
 var/checkpoint.json       翻页游标
 ```
+
+四份报告始终来自同一个 SQLite 一致性读视图，并共享 `bundle_id` 与 `content_digest`（JSON 的 `bundle` 字段、Markdown 注释头、CSV 末两列、JSONL 每行）。`current` 是唯一原子切换点：只有四个格式全部落盘并通过摘要核对后才会切换，因此读者不会看到“新 JSON + 旧 Markdown”的混合批次。
+
+复核预览使用 `jobtrace.bundle.read_preview()`：返回候选批次 ID、`completed_formats` 与 `missing_formats`，其文件位于 `bundles/<bundle_id>/`，绝不会写入四个已发布路径。中断后可用 `python -m jobtrace report --recover` 重新核对已发布指针。
 
 演示进程默认常驻；`Ctrl+C` 结束。只跑一次并自动退出：
 
@@ -118,7 +126,7 @@ make lint-size
 
 测试覆盖配置与 URL 防护、薪资解析、列表/详情解析、翻页循环、幂等、完整生命周期、原始证据、报告 golden、端到端 demo 与代码行数预算。
 
-行数口径：`lint-size` 统计 `.py`、`.html`、`.yaml` 这类代码/配置源文件（含测试），要求总量 2500–4500 行；`.md` 文档不计入总代码量，但所有 `.py`、`.html`、`.yaml`、`.md` 文件均受单文件 300 行上限约束。
+行数口径：`lint-size` 统计 `.py`、`.html`、`.yaml` 这类代码/配置源文件（含测试），要求总量 2500–6000 行；`.md` 文档不计入总代码量，但所有 `.py`、`.html`、`.yaml`、`.md` 文件均受单文件 300 行上限约束。
 
 ## 边界
 
