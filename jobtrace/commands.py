@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from argparse import Namespace
 from pathlib import Path
 from typing import Any
@@ -10,12 +11,14 @@ from urllib.parse import urlsplit
 from .clock import clock_from_config
 from .config import DEFAULT_CONFIG, DEFAULT_SELECTORS, LoadedConfig, load_config
 from .errors import ConfigError
-from .lint_size import check
+from .lint_size import MAX_TOTAL_LINES, MIN_TOTAL_LINES, check
 from .mock_site import FIXTURES_DIR, create_app as create_mock_app
 from .pipeline import run_collection
-from .report import write_reports
+from .report import render_qualification_markdown, write_reports
 from .review import create_app as create_review_app
 from .serving import RunningServer, start_server, wait_forever
+from .skill_eval import evaluate_query
+from .skill_exp import RequirementError
 from .store import Store
 
 
@@ -187,6 +190,19 @@ def command_serve_review(args: Namespace) -> int:
     return 0
 
 
+def command_qualify(args: Namespace) -> int:
+    payload = json.loads(Path(args.input).read_text(encoding="utf-8"))
+    try:
+        report = evaluate_query(payload)
+    except (RequirementError, KeyError, TypeError, ValueError) as exc:
+        raise ConfigError(f"invalid qualification query: {exc}") from exc
+    if args.json:
+        print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2, sort_keys=True))
+    else:
+        print(render_qualification_markdown(report), end="")
+    return 0
+
+
 def command_lint_size(args: Namespace) -> int:
     report = check(Path(args.root).resolve())
     print(f"Checked {len(report.files)} source files; total {report.total} code lines.")
@@ -197,7 +213,8 @@ def command_lint_size(args: Namespace) -> int:
         for name, lines in sorted(report.oversized.items()):
             print(f"  {lines:4d}  {name}")
         return 1
-    if not 2500 <= report.total <= 4500:
-        print("Total code line count is outside the required 2500-4500 range.")
+    if not MIN_TOTAL_LINES <= report.total <= MAX_TOTAL_LINES:
+        print(f"Total code line count is outside the required "
+              f"{MIN_TOTAL_LINES}-{MAX_TOTAL_LINES} range.")
         return 1
     return 0

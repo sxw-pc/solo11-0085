@@ -70,6 +70,7 @@ python -m jobtrace collect --base-url http://127.0.0.1:8765 --scenario malformed
 python -m jobtrace report --db var/jobtrace.sqlite3 --out var/reports
 python -m jobtrace serve-mock --scenario flaky --port 8765
 python -m jobtrace serve-review --db var/jobtrace.sqlite3 --port 8766
+python -m jobtrace qualify --input query.json   # 离线合成履历 × 受限技能要求资格查询
 ```
 
 场景也可通过 `JOBTRACE_SCENARIO` 选择；配置覆盖键使用点号形式，详见 [docs/CONFIG.md](docs/CONFIG.md)。
@@ -139,3 +140,4 @@ make lint-size
 - [docs/LIFECYCLE.md](docs/LIFECYCLE.md)
 - [docs/COMPLIANCE.md](docs/COMPLIANCE.md)
 - [docs/RUNBOOK.md](docs/RUNBOOK.md)
+- [docs/SKILL_EXPERIENCE.md](docs/SKILL_EXPERIENCE.md)

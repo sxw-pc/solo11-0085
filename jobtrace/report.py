@@ -211,3 +211,39 @@ def write_reports(
         for event in report["events"]:
             handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
     return {key: str(path.resolve()) for key, path in paths.items()}
+
+
+_CONTRACT_NAMES = {"exposure": "接触经验", "dedicated": "专属投入"}
+_VERDICT_NAMES = {"qualified": "合格", "unqualified": "不合格", "insufficient_evidence": "证据不足"}
+_STATUS_NAMES = {"satisfied": "满足", "unmet": "未满足", "insufficient_evidence": "证据不足"}
+
+
+def render_qualification_markdown(report: Any) -> str:
+    """渲染技能经验资格查询的只读审计报告（输入为合成数据，不写台账）。"""
+    req = report.requirement
+    lines = ["# 技能经验资格查询报告", "",
+             "> 完全离线；仅使用合成履历与岗位要求，不含个人信息。", "",
+             f"- 合同：`{report.contract}`（{_CONTRACT_NAMES[report.contract]}）",
+             f"- 结论：**{_VERDICT_NAMES[report.verdict]}**",
+             f"- 要求：{req.source or '、'.join(f'{c.label}>={c.min_months}' for c in req.clauses)}",
+             f"- 履历段：{report.resume['segment_count']} 段", "",
+             "## 子句审计", "",
+             "| 技能 | 最低月数 | 状态 | 已计 | 证据（月份:量(履历段)） |",
+             "| --- | ---: | --- | ---: | --- |"]
+    for clause in report.clauses:
+        evidence = "；".join(f"{item['month']}:{item['amount']}({','.join(item['segments'])})"
+                             for item in clause.evidence) or "无"
+        lines.append(f"| {clause.label} | {clause.min_months} | "
+                     f"{_STATUS_NAMES[clause.status]} | {clause.counted} | {evidence} |")
+    if report.witness:
+        witness = report.witness
+        lines += ["", "## 容量冲突见证", "",
+                  f"- 需求合计：{witness['demand_total']}；可分配上限："
+                  f"{witness['allocated_total']}；缺口：{witness['deficit']}",
+                  f"- 饱和月份：{'、'.join(witness['saturated_months']) or '无'}",
+                  f"- 多技能争用月份：{'、'.join(witness['shared_months']) or '无'}",
+                  f"- {witness['explanation']}"]
+    if report.issues:
+        lines += ["", "## 履历处置说明"]
+        lines += [f"- `{issue['code']}`：{issue['detail']}" for issue in report.issues]
+    return "\n".join(lines) + "\n"

@@ -12,6 +12,7 @@ from .commands import (
     command_collect,
     command_demo,
     command_lint_size,
+    command_qualify,
     command_report,
     command_serve_mock,
     command_serve_review,
@@ -91,6 +92,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     lint = commands.add_parser("lint-size", help="check source line budgets")
     lint.add_argument("--root", default=".")
+
+    qualify = commands.add_parser(
+        "qualify", help="evaluate an offline synthetic skill-experience query")
+    qualify.add_argument("--input", required=True,
+                         help="JSON query file: requirement/contract/resume")
+    qualify.add_argument("--json", action="store_true", help="emit JSON instead of Markdown")
     return parser
 
 
@@ -100,7 +107,7 @@ def main(argv: list[str] | None = None) -> int:
     handlers: dict[str, Callable[[argparse.Namespace], int]] = {
         "demo": command_demo, "collect": command_collect, "report": command_report,
         "serve-mock": command_serve_mock, "serve-review": command_serve_review,
-        "lint-size": command_lint_size,
+        "lint-size": command_lint_size, "qualify": command_qualify,
     }
     try:
         return handlers[args.command](args)
