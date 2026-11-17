@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "scenario": "quad_unknown",
+  "description": "四卡场景变体：B1 详情缺少雇佣类型，用于验证未知值不按非实习处理。",
+  "extends": "quad",
+  "omit_fields": {"B1": ["employment_type"]},
+  "faults": {}
+}

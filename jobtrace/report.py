@@ -85,6 +85,37 @@ def _event_payload(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _sampling_payload(sampling: Any) -> dict[str, Any] | None:
+    """Report only the contract, counts, coverage, and inference status of a run."""
+    if not isinstance(sampling, dict) or not sampling.get("contract"):
+        return None
+    counts = sampling.get("counts") or {}
+    estimate = sampling.get("estimate") or {}
+    return {
+        "contract": sampling.get("contract"),
+        "budget": sampling.get("budget"), "seed": sampling.get("seed"),
+        "stratum_field": sampling.get("stratum_field"),
+        "allocations": sampling.get("allocations") or {},
+        "uncovered_strata": sampling.get("uncovered_strata") or {},
+        "uncovered_ids": sampling.get("uncovered_ids") or [],
+        "counts": {
+            key: counts.get(key, 0)
+            for key in ("list_discovered", "list_unique", "duplicates_removed",
+                        "detail_attempted", "detail_succeeded", "detail_failed",
+                        "verified", "verified_positive", "unknown_field", "not_attempted")
+        },
+        "estimate": {
+            "intern_count": estimate.get("intern_count"),
+            "proportion": estimate.get("proportion"),
+            "label": estimate.get("label"),
+        } if estimate else None,
+        "bounds": sampling.get("bounds"),
+        "variance_estimable": bool(sampling.get("variance_estimable")),
+        "variance_reason": sampling.get("variance_reason"),
+        "claims": sampling.get("claims") or {},
+    }
+
+
 def build_report(store: Store, clock: Clock, site_key: str | None = None) -> dict[str, Any]:
     latest = store.latest_run(site_key)
     selected_site = site_key or (latest["site_key"] if latest else "")
@@ -114,6 +145,7 @@ def build_report(store: Store, clock: Clock, site_key: str | None = None) -> dic
             {key: notes.get(key, {} if key == "selector_misses" else [])
              for key in ("lifecycle", "failures", "warnings", "selector_misses")}
         )
+        latest_payload["sampling"] = _sampling_payload(notes.get("sampling"))
     raw_count = len(store.raw_documents_for_run(latest["run_id"])) if latest else 0
     return {
         "schema_version": 1, "generated_at": iso_z(clock.now()),
@@ -121,6 +153,50 @@ def build_report(store: Store, clock: Clock, site_key: str | None = None) -> dic
         "latest_run": latest_payload, "runs": runs, "jobs": jobs, "events": events,
         "raw_evidence": {"documents_in_latest_run": raw_count},
     }
+
+
+def _render_sampling(lines: list[str], sampling: dict[str, Any] | None) -> None:
+    if not sampling:
+        return
+    counts = sampling.get("counts") or {}
+    estimate = sampling.get("estimate") or {}
+    bounds = sampling.get("bounds") or {}
+    claims = sampling.get("claims") or {}
+    covered = sampling.get("uncovered_strata") or {}
+    contract = sampling.get("contract")
+    lines.extend([
+        "", "## 有界详情抽样", "",
+        f"- 合同：`{contract}`；分层字段：`{sampling.get('stratum_field')}`；"
+        f"预算：{sampling.get('budget')}；种子：{sampling.get('seed')}",
+        f"- 列表发现数：{counts.get('list_discovered', 0)}；去重后样本框："
+        f"{counts.get('list_unique', 0)}；重复 ID：{counts.get('duplicates_removed', 0)}",
+        f"- 详情尝试数：{counts.get('detail_attempted', 0)}；成功样本数："
+        f"{counts.get('detail_succeeded', 0)}；失败/未知：{counts.get('detail_failed', 0)}；"
+        f"已验证个数：{counts.get('verified', 0)}；未尝试：{counts.get('not_attempted', 0)}",
+        f"- 未覆盖层：`{canonical_json(covered)}`；未覆盖 ID："
+        f"`{canonical_json(sampling.get('uncovered_ids') or [])}`",
+        f"- 覆盖范围：`{claims.get('coverage_scope')}`；已跑完全部详情："
+        f"`{str(claims.get('details_complete')).lower()}`；"
+        f"是否可声称整页无偏比例："
+        f"`{str(claims.get('whole_page_unbiased_proportion')).lower()}`",
+    ])
+    if estimate.get("intern_count") is not None:
+        lines.append(f"- 设计加权估计（实习数）：{estimate['intern_count']}"
+                     f"（{estimate.get('label')}），未经验证的个数不计为 0。")
+    elif contract == "probability":
+        lines.append("- 设计加权估计：不可得（无偏概率样本不完整或有失败/未知结果）。")
+    else:
+        lines.append("- 设计加权估计：定向合同不提供整页推断，仅陈述所列 ID 的真实字段。")
+    if bounds:
+        lines.append(f"- 可证上下界（整页实习数）：{bounds.get('intern_count')}；"
+                     f"比例：{bounds.get('proportion')}")
+    if contract == "probability":
+        reason = sampling.get("variance_reason")
+        lines.append("- 方差不可估" if not sampling.get("variance_estimable")
+                     else "- 方差可估")
+        if reason:
+            lines.append(f"- 原因：{reason}")
+    lines.append(f"- 说明：{claims.get('note')}")
 
 
 def _cell(value: Any) -> str:
@@ -146,6 +222,7 @@ def render_markdown(report: dict[str, Any]) -> str:
     counts = summary["event_counts"]
     lines.extend(["", "## 生命周期事件计数", "", "| 事件 | 数量 |", "| --- | ---: |"])
     lines.extend(f"| {name} | {counts.get(name, 0)} |" for name in EVENT_TYPES)
+    _render_sampling(lines, latest.get("sampling") if latest else None)
     lines.extend(["", "## 最新运行事件", ""])
     if report["events"]:
         lines.extend(["| 类型 | 岗位 | 字段 | 旧值 | 新值 | 时间 |", "| --- | --- | --- | --- | --- | --- |"])

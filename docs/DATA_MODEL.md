@@ -28,7 +28,7 @@ SQLite schema 见 `jobtrace/schema.py`，当前 `schema_version=1`。写库使�
 - `pages_fetched`、`list_cards`、`unique_jobs`、`details_ok`、`details_failed`、`duplicate_ids`、`parse_warnings`。
 - `resumed`：是否从游标继续。
 - `stop_reason`：`natural_end`、`detail_failures`、`pagination_loop`、`pagination_limit`、`detail_limit`、`resumed_partial`、`no_jobs`、`exception` 等。
-- `notes_json`：失败摘要、警告、选择器缺失、请求统计与生命周期计数。
+- `notes_json`：失败摘要、警告、选择器缺失、请求统计、生命周期计数与有界详情抽样审计（合同、抽样框摘要、种子、分配、估计/界限、覆盖声明，见 [SAMPLING.md](SAMPLING.md)）。
 
 相同 `run_id` 使用 `INSERT OR IGNORE`。若对已完成 run 重放，生命周期引擎会跳过，避免重复事件。
 

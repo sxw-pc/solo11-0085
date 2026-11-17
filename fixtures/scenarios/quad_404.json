@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "scenario": "quad_404",
+  "description": "四卡场景变体：B1 详情返回 404，用于验证失败不被当作非实习且入样概率不变。",
+  "extends": "quad",
+  "listing": {
+    "page_size": 4,
+    "missing_detail_ids": ["B1"],
+    "duplicate_ids": [],
+    "malformed_card_ids": []
+  },
+  "faults": {}
+}

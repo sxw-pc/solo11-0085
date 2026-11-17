@@ -13,6 +13,7 @@ from .errors import StorageError
 from .http_client import HttpClient
 from .lifecycle import LifecycleEngine, LifecycleResult
 from .rawstore import RawStore
+from .sampling import SamplingRequest
 from .store import Store
 
 _SAFE_ID = re.compile(r"[^a-zA-Z0-9_.-]+")
@@ -55,6 +56,7 @@ def run_collection(
     resume: bool = False,
     clock: Clock | None = None,
     sleep: Any = None,
+    sampling: SamplingRequest | None = None,
 ) -> CollectionOutcome:
     config = loaded.config
     selected_scenario = scenario or config.site.scenario
@@ -71,7 +73,7 @@ def run_collection(
         store.begin_run(run_id=identifier, site_key=config.site.name,
                         scenario=selected_scenario, base_url=config.site.base_url,
                         config_hash=loaded.fingerprint, started_at=started_at, resumed=resume)
-        crawler = Crawler(loaded, client, raw_store, active_clock)
+        crawler = Crawler(loaded, client, raw_store, active_clock, sampling=sampling)
         try:
             result = crawler.crawl(identifier, resume=resume)
         except Exception as exc:
@@ -98,6 +100,7 @@ def run_collection(
             "failures": failure_payload(result)[:50], "warnings": result.warnings[:100],
             "selector_misses": result.selector_misses,
             "request_stats": result.request_stats, "lifecycle": lifecycle.summary(),
+            "sampling": result.sampling or {},
         }
         store.finish_run(
             identifier, status="complete" if result.complete else "incomplete",

@@ -20,6 +20,12 @@ class ListItem:
     detail_url: str
     issues: tuple[str, ...] = ()
 
+    def visible_fields(self) -> dict[str, str]:
+        """Fields observable from the listing card, usable for stratification."""
+        return {"external_id": self.external_id, "title": self.title,
+                "company": self.company, "location": self.location,
+                "salary": self.salary, "detail_url": self.detail_url}
+
 
 @dataclass(frozen=True)
 class JobObservation:

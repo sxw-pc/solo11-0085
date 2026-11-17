@@ -83,6 +83,8 @@ python -m jobtrace serve-review --db var/jobtrace.sqlite3 --port 8766
 | `malformed` | 2 个详情 404、1 个必填公司缺失、1 张畸形列表卡片、若可选字段缺失 | 61 个有效观测、3 个详情失败；运行不完整，不处理消失/关闭 |
 | `pagination_loop` | 末页“下一页”指回第 2 页 | 第 7 页后识别重复 URL，`stop_reason=pagination_loop`，不完整 |
 | `flaky` | 列表页 2/5 各注入一次 503；详情 `JT-0007` 两次、`JT-0033` 一次 | 有限指数退避重试后完整成功 |
+| `quad` | 4 张卡片、2 家公司；A 层非实习、B 层含实习 | 配合 `max_details=2` 验证定向/概率合同，运行保持不完整 |
+| `quad_unknown` / `quad_404` | 在 `quad` 上省略 B1 的雇佣类型 / 让 B1 详情 404 | 未知值不计为非实习，抽样权重不随成败重算 |
 
 场景文件位于 `fixtures/scenarios/`，通过 `extends` 增量继承基线，避免复制大段数据。
 
@@ -95,6 +97,7 @@ python -m jobtrace serve-review --db var/jobtrace.sqlite3 --port 8766
 - **可恢复翻页**：检查点保存下一页 URL、已访问页与完成状态；`--resume` 可从游标继续，并把本次运行标为不完整。
 - **确定性**：时钟、端口、运行 ID 均可注入/固定；报告时间规范化到秒；测试使用固定时钟与隔离临时目录。
 - **只读复核台**：仅提供 GET 查询与健康检查，POST 返回 405；数据库缺失时返回 503。
+- **有界详情抽样**：详情预算不足时，按定向 ID 或按公司分层的概率合同抽样；报告区分列表发现数、详情尝试数、成功样本数、已验证个数与设计估计/上下界，详见 [docs/SAMPLING.md](docs/SAMPLING.md)。
 
 ## 目录
 
@@ -103,9 +106,9 @@ jobtrace/            采集、解析、存储、生命周期、报告、CLI
   mock_site/         Flask 合成招聘站点与故障注入
   review/            只读 Flask 复核台
 configs/             默认配置与选择器
-fixtures/scenarios/  5 个合成场景
+fixtures/scenarios/  8 个合成场景
 fixtures/expected/   golden 期望
-tests/               11 个测试文件，包含端到端与行数预算测试
+tests/               13 个测试文件，包含端到端、抽样与行数预算测试
 docs/                设计、配置、数据模型、生命周期、合规、运行手册
 ```
 
@@ -116,9 +119,9 @@ make test
 make lint-size
 ```
 
-测试覆盖配置与 URL 防护、薪资解析、列表/详情解析、翻页循环、幂等、完整生命周期、原始证据、报告 golden、端到端 demo 与代码行数预算。
+测试覆盖配置与 URL 防护、薪资解析、列表/详情解析、翻页循环、幂等、完整生命周期、原始证据、报告 golden、端到端 demo、有界详情抽样（定向/概率合同，见 [docs/SAMPLING.md](docs/SAMPLING.md)）与代码行数预算。
 
-行数口径：`lint-size` 统计 `.py`、`.html`、`.yaml` 这类代码/配置源文件（含测试），要求总量 2500–4500 行；`.md` 文档不计入总代码量，但所有 `.py`、`.html`、`.yaml`、`.md` 文件均受单文件 300 行上限约束。
+行数口径：`lint-size` 统计 `.py`、`.html`、`.yaml` 这类代码/配置源文件（含测试），要求总量 2500–6500 行；`.md` 文档不计入总代码量，但所有 `.py`、`.html`、`.yaml`、`.md` 文件均受单文件 300 行上限约束。
 
 ## 边界
 

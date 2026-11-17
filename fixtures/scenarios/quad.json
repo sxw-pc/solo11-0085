@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "scenario": "quad",
+  "description": "四张卡片、两家公司：A 属公司甲（非实习），B 属公司乙（实习），用于有界抽详情复核。",
+  "jobs": [
+    {"id": "A1", "title": "后端工程师", "company": "示例公司甲（虚构）", "location": "上海 · 徐汇区",
+     "salary": "20-30K", "experience": "3-5年", "employment_type": "全职",
+     "posted_at": "2025-12-01", "description": "合成岗位，仅用于离线抽样复核。", "tags": ["Python"]},
+    {"id": "A2", "title": "前端工程师", "company": "示例公司甲（虚构）", "location": "上海 · 徐汇区",
+     "salary": "18-25K", "experience": "1-3年", "employment_type": "全职",
+     "posted_at": "2025-12-02", "description": "合成岗位，仅用于离线抽样复核。", "tags": ["JavaScript"]},
+    {"id": "B1", "title": "数据分析实习生", "company": "星砂科技（虚构）", "location": "深圳 · 南山区",
+     "salary": "6-8K", "experience": "经验不限", "employment_type": "实习",
+     "posted_at": "2025-12-03", "description": "合成岗位，仅用于离线抽样复核。", "tags": ["SQL"]},
+    {"id": "B2", "title": "运营专员", "company": "星砂科技（虚构）", "location": "深圳 · 南山区",
+     "salary": "8-12K", "experience": "1-3年", "employment_type": "全职",
+     "posted_at": "2025-12-04", "description": "合成岗位，仅用于离线抽样复核。", "tags": ["运营"]}
+  ],
+  "listing": {"page_size": 4, "duplicate_ids": [], "malformed_card_ids": [], "missing_detail_ids": []},
+  "faults": {},
+  "omit_fields": {}
+}

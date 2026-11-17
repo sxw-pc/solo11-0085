@@ -35,6 +35,7 @@
 | `store.py` | SQLite schema、事务、幂等写入、查询 |
 | `lifecycle.py` | NEW/CHANGED/DISAPPEARED/CLOSED/REOPENED 事件 |
 | `report.py` | 确定性 Markdown/JSON 与 CSV/JSONL 导出 |
+| `sampling.py` / `sampling_audit.py` / `sampling_eval.py` | 有界详情的抽样框、定向/概率合同、只读审计与设计加权估计 |
 | `pipeline.py` | 单次运行的编排与失败记录 |
 | `commands.py` / `cli.py` | demo、collect、report、serve 子命令 |
 
