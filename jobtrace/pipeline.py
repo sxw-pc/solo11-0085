@@ -65,8 +65,10 @@ def run_collection(
     store = Store(config.storage.database)
     raw_store = RawStore(config.storage.raw_dir, active_clock)
     kwargs = {"sleep": sleep} if sleep is not None else {}
-    client = HttpClient(config.crawl, config.site.allowed_hosts,
-                        config.site.allowed_ports, active_clock, **kwargs)
+    client = HttpClient(
+        config.crawl, config.site.allowed_hosts, config.site.allowed_ports,
+        active_clock, charset_contract=config.crawl.charset_contract, **kwargs,
+    )
     try:
         store.begin_run(run_id=identifier, site_key=config.site.name,
                         scenario=selected_scenario, base_url=config.site.base_url,
@@ -98,6 +100,8 @@ def run_collection(
             "failures": failure_payload(result)[:50], "warnings": result.warnings[:100],
             "selector_misses": result.selector_misses,
             "request_stats": result.request_stats, "lifecycle": lifecycle.summary(),
+            "charset_contract": config.crawl.charset_contract,
+            "charset_decisions": result.summary()["charset_decisions"][:100],
         }
         store.finish_run(
             identifier, status="complete" if result.complete else "incomplete",

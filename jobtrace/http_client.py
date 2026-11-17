@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import ipaddress
-import re
 import time
 from dataclasses import dataclass, field
 from typing import Callable, Iterable
@@ -11,6 +10,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 import requests
 
+from .charset import CONTRACTS, CharsetError
 from .clock import Clock, iso_z
 from .config import CrawlConfig
 from .errors import FetchError, UnsafeURLError
@@ -18,7 +18,6 @@ from .fingerprint import sha256_bytes
 
 RETRYABLE_STATUSES = {408, 425, 429, 500, 502, 503, 504}
 REDIRECT_STATUSES = {301, 302, 303, 307, 308}
-_CHARSET = re.compile(r"charset=([\w.-]+)", re.IGNORECASE)
 
 
 @dataclass
@@ -47,7 +46,6 @@ class HttpResponse:
     url: str
     status: int
     content: bytes
-    text: str
     content_type: str
     sha256: str
     attempts: int
@@ -62,13 +60,17 @@ class HttpClient:
     def __init__(self, crawl: CrawlConfig, allowed_hosts: Iterable[str],
                  allowed_ports: Iterable[int], clock: Clock, *,
                  session: requests.Session | None = None,
-                 sleep: Callable[[float], None] = time.sleep):
+                 sleep: Callable[[float], None] = time.sleep,
+                 charset_contract: str = "reconcile"):
+        if charset_contract not in CONTRACTS:
+            raise CharsetError(f"unknown charset contract: {charset_contract!r}")
         self.crawl = crawl
         self.allowed_hosts = {host.lower() for host in allowed_hosts}
         self.allowed_ports = set(allowed_ports)
         self.clock = clock
         self.stats = RequestStats()
         self._sleep = sleep
+        self.charset_contract = charset_contract
         self.session = session or requests.Session()
         self.session.trust_env = False
         self.session.headers.update(
@@ -134,15 +136,6 @@ class HttpClient:
         self.stats.bytes_downloaded += total
         return b"".join(chunks)
 
-    @staticmethod
-    def _decode(content: bytes, content_type: str) -> str:
-        match = _CHARSET.search(content_type)
-        encoding = match.group(1) if match else "utf-8"
-        try:
-            return content.decode(encoding)
-        except (LookupError, UnicodeDecodeError):
-            return content.decode("utf-8", errors="replace")
-
     def _wait_before_retry(self, attempt: int) -> None:
         self.stats.retries += 1
         self._sleep(self.crawl.retry_backoff_seconds * (2 ** (attempt - 1)))
@@ -200,8 +193,7 @@ class HttpClient:
                 self._sleep(self.crawl.request_interval_seconds)
             return HttpResponse(
                 url=safe_url, status=response.status_code, content=content,
-                text=self._decode(content, content_type), content_type=content_type,
-                sha256=sha256_bytes(content), attempts=attempt,
-                fetched_at=iso_z(self.clock.now()),
+                content_type=content_type, sha256=sha256_bytes(content),
+                attempts=attempt, fetched_at=iso_z(self.clock.now()),
             )
         raise FetchError(last_error, url=safe_url)  # pragma: no cover - loop returns/raises

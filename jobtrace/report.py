@@ -112,8 +112,10 @@ def build_report(store: Store, clock: Clock, site_key: str | None = None) -> dic
         notes = store.notes(latest)
         latest_payload.update(
             {key: notes.get(key, {} if key == "selector_misses" else [])
-             for key in ("lifecycle", "failures", "warnings", "selector_misses")}
+             for key in ("lifecycle", "failures", "warnings", "selector_misses",
+                         "charset_decisions")}
         )
+        latest_payload["charset_contract"] = notes.get("charset_contract")
     raw_count = len(store.raw_documents_for_run(latest["run_id"])) if latest else 0
     return {
         "schema_version": 1, "generated_at": iso_z(clock.now()),
@@ -174,8 +176,21 @@ def render_markdown(report: dict[str, Any]) -> str:
         "", "## 证据与诊断", "",
         f"- 原始响应文档数：{report['raw_evidence']['documents_in_latest_run']}",
         f"- 选择器缺失统计：`{canonical_json(latest.get('selector_misses', {}) if latest else {})}`",
-        "",
     ])
+    decisions = latest.get("charset_decisions", []) if latest else []
+    if decisions:
+        lines.extend(["", "### 字符集验收决策", "",
+                      "| URL | 结论 | 采用编码 | 证据来源 | 理由 |",
+                      "| --- | --- | --- | --- | --- |"])
+        for item in decisions:
+            verdict = "歧义" if item.get("ambiguous") else (
+                "接受" if item.get("accepted") else "拒绝")
+            lines.append("| {} | {} | {} | {} | {} |".format(
+                _cell(item.get("url", "").replace("http://", "").replace("https://", "")),
+                verdict, _cell(item.get("encoding") or ""),
+                _cell(item.get("source") or ""), _cell(item.get("reason") or ""),
+            ))
+    lines.append("")
     return "\n".join(lines)
 
 

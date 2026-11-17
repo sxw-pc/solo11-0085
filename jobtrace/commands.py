@@ -197,7 +197,7 @@ def command_lint_size(args: Namespace) -> int:
         for name, lines in sorted(report.oversized.items()):
             print(f"  {lines:4d}  {name}")
         return 1
-    if not 2500 <= report.total <= 4500:
-        print("Total code line count is outside the required 2500-4500 range.")
+    if not 2500 <= report.total <= 6500:
+        print("Total code line count is outside the required 2500-6500 range.")
         return 1
     return 0

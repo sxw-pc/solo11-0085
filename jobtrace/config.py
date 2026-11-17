@@ -43,6 +43,7 @@ class CrawlConfig:
     max_response_bytes: int
     request_interval_seconds: float
     user_agent: str
+    charset_contract: str = "reconcile"
 
 
 @dataclass(frozen=True)
@@ -139,9 +140,14 @@ def _parse_crawl(raw: Any) -> CrawlConfig:
     keys = {
         "connect_timeout_seconds", "read_timeout_seconds", "max_retries",
         "retry_backoff_seconds", "max_response_bytes", "request_interval_seconds",
-        "user_agent",
+        "user_agent", "charset_contract",
     }
-    data = strict_map(raw, keys, "crawl")
+    data = strict_map(dict(raw, charset_contract=raw.get("charset_contract", "reconcile")),
+                      keys, "crawl")
+    contract = text(data.get("charset_contract", "reconcile"),
+                    "crawl.charset_contract")
+    if contract not in ("strict", "reconcile"):
+        raise ConfigError("crawl.charset_contract must be 'strict' or 'reconcile'")
     return CrawlConfig(
         connect_timeout_seconds=number(
             data["connect_timeout_seconds"], "crawl.connect_timeout_seconds", 0.05, 60),
@@ -155,6 +161,7 @@ def _parse_crawl(raw: Any) -> CrawlConfig:
         request_interval_seconds=number(
             data["request_interval_seconds"], "crawl.request_interval_seconds", 0, 10),
         user_agent=text(data["user_agent"], "crawl.user_agent"),
+        charset_contract=contract,
     )
 
 

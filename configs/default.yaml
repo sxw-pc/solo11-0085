@@ -20,6 +20,8 @@ crawl:
   max_response_bytes: 1048576
   request_interval_seconds: 0.0
   user_agent: "jobtrace-offline-eval/1.0"
+  # strict: 仅信任能严格无损解码的 HTTP charset；reconcile: 头声明失败时允许文档 meta/BOM 覆盖
+  charset_contract: "reconcile"
 
 storage:
   database: "var/jobtrace.sqlite3"

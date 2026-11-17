@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 from urllib.parse import urlencode
 
+from .charset import CharsetDecision, accepted_text, analyze
 from .clock import Clock, iso_z
 from .config import LoadedConfig
 from .errors import FetchError, PaginationLimitError, PaginationLoopError
@@ -41,6 +42,7 @@ class CrawlResult:
     observations: list[JobObservation] = field(default_factory=list)
     failures: list[DetailFailure] = field(default_factory=list)
     documents: list[RawDocument] = field(default_factory=list)
+    decisions: list[CharsetDecision] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     selector_misses: dict[str, int] = field(default_factory=dict)
     stop_reason: str = "natural_end"
@@ -57,6 +59,12 @@ class CrawlResult:
             "details_failed": self.details_failed, "duplicate_ids": self.duplicate_ids,
             "parse_warnings": self.parse_warnings, "stop_reason": self.stop_reason,
             "complete": self.complete, "resumed": self.resumed,
+            "charset_decisions": [
+                {"url": item.url, "accepted": item.accepted, "ambiguous": item.ambiguous,
+                 "encoding": item.accepted_encoding, "source": item.accepted_source,
+                 "reason": item.reason}
+                for item in self.decisions
+            ],
             "request_stats": self.request_stats,
         }
 
@@ -81,6 +89,25 @@ class Crawler:
             http_status=response.status, content_type=response.content_type,
             fetched_at=response.fetched_at,
         )
+
+    def _accept(self, response: HttpResponse, kind: str, run_id: str) -> CharsetDecision:
+        decision = analyze(
+            response.content, sha256=response.sha256, url=response.url, kind=kind,
+            content_type=response.content_type,
+            contract=self.client.charset_contract, selectors=self.selectors,
+        )
+        self.raw_store.put_decision(decision, run_id)
+        return decision
+
+    def _reject(self, decision: CharsetDecision, failures: list[DetailFailure],
+                external_id: str | None, warnings: list[str]) -> None:
+        label = decision.url if external_id is None else f"{external_id} {decision.url}"
+        warnings.append(f"charset rejected for {label}: {decision.reason}")
+        if external_id is not None:
+            failures.append(DetailFailure(
+                external_id=external_id, url=decision.url,
+                error=f"charset acceptance failed: {decision.reason}",
+            ))
 
     def _save_cursor(self, guard: PaginationGuard, next_url: str | None, completed: bool) -> None:
         cursor = guard.cursor(
@@ -116,17 +143,32 @@ class Crawler:
         observations: list[JobObservation] = []
         failures: list[DetailFailure] = []
         documents: list[RawDocument] = []
+        decisions: list[CharsetDecision] = []
         warnings: list[str] = []
         selector_misses: dict[str, int] = {}
         discovered: dict[str, ListItem] = {}
         duplicates = list_cards = pages_fetched = 0
         fatal, stop_reason = False, "natural_end"
+        charset_failures = 0
         current_url: str | None = start_url
         while current_url:
             response = self.client.get(current_url)
             pages_fetched += 1
             documents.append(self._document(response, "list", run_id))
-            parsed = parse_list_page(response.text, response.url, self.selectors)
+            decision = self._accept(response, "list", run_id)
+            decisions.append(decision)
+            if not decision.accepted:
+                charset_failures += 1
+                fatal = True
+                self._reject(decision, failures, None, warnings)
+                self._save_cursor(guard, None, completed=False)
+                stop_reason = "charset_rejected"
+                break
+            html = accepted_text(response.content, decision)
+            parsed = parse_list_page(
+                html, response.url, self.selectors,
+                source_encoding=decision.accepted_encoding,
+            )
             list_cards += parsed.card_count
             warnings.extend(parsed.issues)
             selector_misses = merge_selector_misses(selector_misses, parsed.selector_misses)
@@ -159,8 +201,18 @@ class Crawler:
             try:
                 response = self.client.get(item.detail_url)
                 documents.append(self._document(response, "detail", run_id))
+                decision = self._accept(response, "detail", run_id)
+                decisions.append(decision)
+                if not decision.accepted:
+                    charset_failures += 1
+                    fatal = True
+                    self._reject(decision, failures, item.external_id, warnings)
+                    continue
                 detail = parse_detail_page(
-                    response.text, response.url, self.site.name, item, self.selectors
+                    accepted_text(response.content, decision), response.url,
+                    self.site.name, item, self.selectors,
+                    source=response.content,
+                    source_encoding=decision.accepted_encoding,
                 )
                 selector_misses = merge_selector_misses(selector_misses, detail.selector_misses)
                 warnings.extend(f"{item.external_id}: {issue}" for issue in detail.issues)
@@ -189,7 +241,7 @@ class Crawler:
             fatal = True
             if stop_reason == "natural_end":
                 stop_reason = "resumed_partial"
-        if not discovered:
+        if not discovered and not charset_failures:
             fatal, stop_reason = True, "no_jobs"
         if not observations and not failures and not fatal:
             fatal, stop_reason = True, "no_details"
@@ -206,7 +258,8 @@ class Crawler:
             details_ok=len(observations), details_failed=len(failures),
             duplicate_ids=duplicates, parse_warnings=len(warnings),
             observations=observations, failures=failures, documents=documents,
-            warnings=warnings, selector_misses=dict(sorted(selector_misses.items())),
+            decisions=decisions, warnings=warnings,
+            selector_misses=dict(sorted(selector_misses.items())),
             stop_reason=stop_reason, complete=not fatal, resumed=resumed,
             request_stats=self.client.stats.as_dict(),
         )

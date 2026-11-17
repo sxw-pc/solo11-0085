@@ -35,8 +35,9 @@
 | `max_response_bytes` | 单响应上限 | 1024–50,000,000 |
 | `request_interval_seconds` | 成功后固定间隔 | 0–10 |
 | `user_agent` | 请求 UA | 非空字符串 |
+| `charset_contract` | 字符集验收合同 | `strict` 或 `reconcile`（默认 `reconcile`） |
 
-仅 `408`、`425`、`429`、`500`、`502`、`503`、`504` 与连接异常会重试；重定向永不跟随。
+仅 `408`、`425`、`429`、`500`、`502`、`503`、`504` 与连接异常会重试；重定向永不跟随。`charset_contract` 的语义见 DESIGN.md「字符集验收合同」。
 
 ## storage
 

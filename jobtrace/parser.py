@@ -17,6 +17,7 @@ from .salary import parse_salary
 from .selectors import Selectors
 
 _JOB_ID = re.compile(r"/jobs/([^/?#]+)")
+_SPAN = tuple[int, int] | None
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,7 @@ class ListPage:
     card_count: int
     issues: tuple[str, ...] = ()
     selector_misses: dict[str, int] = field(default_factory=dict)
+    source_encoding: str | None = None
 
 
 @dataclass(frozen=True)
@@ -34,6 +36,9 @@ class DetailResult:
     required_missing: tuple[str, ...] = ()
     issues: tuple[str, ...] = ()
     selector_misses: dict[str, int] = field(default_factory=dict)
+    title_span: _SPAN = None
+    company_span: _SPAN = None
+    source_encoding: str | None = None
 
     @property
     def ok(self) -> bool:
@@ -42,6 +47,22 @@ class DetailResult:
 
 def _text(node: Tag | None) -> str:
     return clean_text(node.get_text(" ", strip=True)) if node is not None else ""
+
+
+def _span(source: bytes | None, encoding: str | None, raw_text: str) -> _SPAN:
+    """Byte range of a field's raw node text inside the original response bytes."""
+
+    if source is None or encoding is None or not raw_text:
+        return None
+    span_encoding = "utf-8" if encoding == "utf-8-sig" else encoding
+    try:
+        raw = raw_text.encode(span_encoding)
+    except UnicodeEncodeError:
+        return None
+    offset = source.find(raw)
+    if offset < 0:
+        return None
+    return offset, offset + len(raw)
 
 
 def _select_one(root: Tag, selector: str) -> Tag | None:
@@ -62,7 +83,8 @@ def _missing(counter: dict[str, int], field_name: str) -> None:
     counter[field_name] = counter.get(field_name, 0) + 1
 
 
-def parse_list_page(html: str, page_url: str, selectors: Selectors) -> ListPage:
+def parse_list_page(html: str, page_url: str, selectors: Selectors, *,
+                    source_encoding: str | None = None) -> ListPage:
     soup = BeautifulSoup(html, "html.parser")
     cards = _select_all(soup, selectors.list.item)
     misses: dict[str, int] = {}
@@ -107,6 +129,7 @@ def parse_list_page(html: str, page_url: str, selectors: Selectors) -> ListPage:
     return ListPage(
         items=tuple(items), next_url=urljoin(page_url, next_href) if next_href else None,
         card_count=len(cards), issues=tuple(issues), selector_misses=misses,
+        source_encoding=source_encoding,
     )
 
 
@@ -120,19 +143,43 @@ def _optional(soup: BeautifulSoup, selector: str, key: str,
 
 
 def parse_detail_page(html: str, page_url: str, site_key: str,
-                      item: ListItem, selectors: Selectors) -> DetailResult:
+                      item: ListItem, selectors: Selectors, *,
+                      source: bytes | None = None,
+                      source_encoding: str | None = None) -> DetailResult:
     soup = BeautifulSoup(html, "html.parser")
     misses: dict[str, int] = {}
     issues: list[str] = []
-    title = _optional(soup, selectors.detail.title, "title", misses, issues)
-    company = _optional(soup, selectors.detail.company, "company", misses, issues)
+    title_node = _select_one(soup, selectors.detail.title)
+    company_node = _select_one(soup, selectors.detail.company)
+    title = _text(title_node)
+    company = _text(company_node)
+    if not title:
+        _missing(misses, "title")
+        issues.append("missing optional field: title")
+    if not company:
+        _missing(misses, "company")
+        issues.append("missing optional field: company")
+    title_span = _span(source, source_encoding,
+                       title_node.get_text(" ", strip=True) if title_node else "")
+    company_span = _span(source, source_encoding,
+                         company_node.get_text(" ", strip=True) if company_node else "")
     required_missing = tuple(
         name for name, value in (("title", title), ("company", company)) if not value
     )
     if required_missing:
         issues.append("missing required field(s): " + ", ".join(required_missing))
         return DetailResult(observation=None, required_missing=required_missing,
-                            issues=tuple(issues), selector_misses=misses)
+                            issues=tuple(issues), selector_misses=misses,
+                            title_span=title_span, company_span=company_span,
+                            source_encoding=source_encoding)
+    if source is not None and (title_span is None or company_span is None):
+        issues.append("required field bytes not located in accepted decoding")
+        missing = tuple(name for name, span in (
+            ("title", title_span), ("company", company_span)) if span is None)
+        return DetailResult(observation=None, required_missing=missing,
+                            issues=tuple(issues), selector_misses=misses,
+                            title_span=title_span, company_span=company_span,
+                            source_encoding=source_encoding)
     location_raw = _optional(soup, selectors.detail.location, "location", misses, issues)
     salary_raw = _optional(soup, selectors.detail.salary, "salary", misses, issues)
     experience_raw = _optional(soup, selectors.detail.experience, "experience", misses, issues)
@@ -160,7 +207,9 @@ def parse_detail_page(html: str, page_url: str, site_key: str,
         detail_url=page_url, posted_at=posted_at or None, source_status=status or None,
         issues=tuple(issues),
     )
-    return DetailResult(observation=observation, issues=tuple(issues), selector_misses=misses)
+    return DetailResult(observation=observation, issues=tuple(issues), selector_misses=misses,
+                        title_span=title_span, company_span=company_span,
+                        source_encoding=source_encoding)
 
 
 def merge_selector_misses(*maps: dict[str, int]) -> dict[str, int]:

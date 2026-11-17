@@ -39,6 +39,7 @@ class RawStore:
         self.clock = clock
         self.objects = self.root / "objects"
         self.manifest = self.root / "manifest.jsonl"
+        self.decision_log = self.root / "decisions.jsonl"
 
     def _ensure(self) -> None:
         self.objects.mkdir(parents=True, exist_ok=True)
@@ -105,3 +106,43 @@ class RawStore:
                     yield RawDocument(**payload)
                 except (TypeError, ValueError, json.JSONDecodeError) as exc:
                     raise RawStoreError(f"invalid manifest line {line_number}: {exc}") from exc
+
+    def put_decision(self, decision: object, run_id: str) -> None:
+        """Append a charset decision idempotently per (run, url, sha, contract)."""
+
+        self._ensure()
+        payload = {"run_id": run_id, "decision": decision.as_dict()}
+        line = canonical_json(payload)
+        if self.decision_log.exists():
+            for existing in self.decision_log.read_text(encoding="utf-8").splitlines():
+                if existing == line:
+                    return
+        with self.decision_log.open("a", encoding="utf-8", newline="\n") as stream:
+            stream.write(line + "\n")
+
+    def find_decision(self, *, sha256: str, url: str,
+                      contract: str | None = None) -> dict[str, object] | None:
+        for record in self.iter_decisions():
+            decision = record["decision"]
+            if decision["sha256"] == sha256 and decision["url"] == url and (
+                contract is None or decision["contract"] == contract
+            ):
+                return record
+        return None
+
+    def decisions_for_run(self, run_id: str) -> list[dict[str, object]]:
+        return [record for record in self.iter_decisions() if record["run_id"] == run_id]
+
+    def iter_decisions(self) -> Iterator[dict[str, object]]:
+        if not self.decision_log.exists():
+            return
+        with self.decision_log.open("r", encoding="utf-8") as stream:
+            for line_number, line in enumerate(stream, start=1):
+                if not line.strip():
+                    continue
+                try:
+                    payload = json.loads(line)
+                    if isinstance(payload, dict) and "decision" in payload:
+                        yield payload
+                except (TypeError, ValueError, json.JSONDecodeError) as exc:
+                    raise RawStoreError(f"invalid decision line {line_number}: {exc}") from exc
