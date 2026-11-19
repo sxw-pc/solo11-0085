@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import sys
 from argparse import Namespace
 from pathlib import Path
 from typing import Any
@@ -11,9 +13,11 @@ from .clock import clock_from_config
 from .config import DEFAULT_CONFIG, DEFAULT_SELECTORS, LoadedConfig, load_config
 from .errors import ConfigError
 from .lint_size import check
-from .mock_site import FIXTURES_DIR, create_app as create_mock_app
+from .mock_site import FIXTURES_DIR
+from .mock_site import create_app as create_mock_app
 from .pipeline import run_collection
 from .report import write_reports
+from .requirement_evidence import requirement_report
 from .review import create_app as create_review_app
 from .serving import RunningServer, start_server, wait_forever
 from .store import Store
@@ -134,6 +138,32 @@ def command_report(args: Namespace) -> int:
     finally:
         store.close()
     _print_paths(paths)
+    return 0
+
+
+def command_requirements(args: Namespace) -> int:
+    """Read-only projection of derived requirement-impact evidence."""
+    loaded = _load(args, {})
+    database = args.db or loaded.config.storage.database
+    if not Path(database).is_file():
+        raise ConfigError(f"database not found: {database}")
+    store = Store(database, readonly=True)
+    try:
+        job = None
+        if args.job:
+            job = store.find_job(args.site or loaded.config.site.name, args.job)
+            if job is None:
+                raise ConfigError(f"job not found: {args.job}")
+        report = requirement_report(store, job_uid=job["job_uid"] if job else None,
+                                    rules_version=args.rules_version)
+    finally:
+        store.close()
+    print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+    summary: dict[str, dict[str, int]] = {}
+    for item in report["evidence"]:
+        counts = summary.setdefault(item["contract"], {})
+        counts[item["change_kind"]] = counts.get(item["change_kind"], 0) + 1
+    print(f"contracts: {json.dumps(summary, ensure_ascii=False, sort_keys=True)}", file=sys.stderr)
     return 0
 
 

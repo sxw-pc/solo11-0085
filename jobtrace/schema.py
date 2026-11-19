@@ -75,4 +75,16 @@ CREATE TABLE IF NOT EXISTS run_documents (
 );
 
 CREATE INDEX IF NOT EXISTS idx_run_documents_run ON run_documents(run_id);
+
+CREATE TABLE IF NOT EXISTS requirement_evidence (
+    job_uid TEXT NOT NULL, run_id TEXT NOT NULL, old_run_id TEXT NOT NULL,
+    rules_version TEXT NOT NULL, contract TEXT NOT NULL, change_kind TEXT NOT NULL,
+    eligibility_changed INTEGER NOT NULL, description_changed INTEGER NOT NULL,
+    old_description_sha256 TEXT NOT NULL, new_description_sha256 TEXT NOT NULL,
+    evidence_json TEXT NOT NULL, created_at TEXT NOT NULL,
+    PRIMARY KEY(job_uid, run_id, rules_version, contract)
+);
+
+CREATE INDEX IF NOT EXISTS idx_requirement_evidence_job
+    ON requirement_evidence(job_uid, run_id);
 """

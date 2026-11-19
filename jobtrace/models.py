@@ -7,6 +7,12 @@ from typing import Any
 
 from .fingerprint import content_hash
 from .normalize import Experience
+from .requirements import (
+    DEFAULT_RULES,
+    RequirementParse,
+    audit_revision,
+    parse_requirements,
+)
 from .salary import SalaryInfo
 
 
@@ -39,6 +45,7 @@ class JobObservation:
     posted_at: str | None = None
     source_status: str | None = None
     issues: tuple[str, ...] = field(default_factory=tuple)
+    requirement: RequirementParse | None = None
 
     def content_payload(self) -> dict[str, Any]:
         return {
@@ -59,6 +66,13 @@ class JobObservation:
     @property
     def content_hash(self) -> str:
         return content_hash(self.content_payload())
+
+    def requirement_parse(self, rules=DEFAULT_RULES) -> RequirementParse:
+        return self.requirement or parse_requirements(self.description, rules)
+
+    def requirement_audit(self, old_description: str | None,
+                          rules=DEFAULT_RULES) -> dict[str, Any]:
+        return audit_revision(old_description, self.description, rules)
 
     def tracked_values(self) -> dict[str, str]:
         tags = "、".join(self.tags)

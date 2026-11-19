@@ -8,6 +8,8 @@ from typing import Any
 
 from .fingerprint import TRACKED_FIELDS, canonical_json, job_uid
 from .models import JobObservation
+from .requirement_evidence import evidence_rows, record_evidence
+from .requirements import DEFAULT_RULES, Rules
 from .store import Store
 
 
@@ -21,6 +23,8 @@ class LifecycleResult:
     unchanged: int = 0
     skipped: bool = False
     changed_fields: dict[str, int] = field(default_factory=dict)
+    requirement_text_revisions: int = 0
+    requirement_impact_changes: int = 0
     events: list[dict[str, Any]] = field(default_factory=list)
 
     def summary(self) -> dict[str, Any]:
@@ -30,6 +34,8 @@ class LifecycleResult:
             "reopened": self.reopened, "unchanged": self.unchanged,
             "skipped": self.skipped,
             "changed_fields": dict(sorted(self.changed_fields.items())),
+            "requirement_text_revisions": self.requirement_text_revisions,
+            "requirement_impact_changes": self.requirement_impact_changes,
         }
 
 
@@ -83,8 +89,9 @@ _JOB_PLACEHOLDERS = ", ".join("?" for _ in range(23))
 
 
 class LifecycleEngine:
-    def __init__(self, store: Store):
+    def __init__(self, store: Store, rules: Rules = DEFAULT_RULES):
         self.store = store
+        self.rules = rules
 
     def apply(self, *, run_id: str, site_key: str, observations: list[JobObservation],
               complete: bool, now: str, close_after_missing_runs: int) -> LifecycleResult:
@@ -140,8 +147,13 @@ class LifecycleEngine:
                             key[field_name] = key.get(field_name, 0) + 1
                     if not changed and not reopened:
                         result.unchanged += 1
+                    self._requirement_change(conn, result, uid, run_id, row, observation, now)
                     _update_job(conn, uid, run_id, now, digest, values)
                 self._snapshot(conn, uid, run_id, digest, payload_json, now)
+            conn.execute(
+                "INSERT OR REPLACE INTO meta(key, value) VALUES('requirements_rules_version', ?)",
+                (self.rules.version,),
+            )
             if complete:
                 self._handle_missing(conn, rows=rows, observed=observed_ids, run_id=run_id,
                                      now=now, threshold=close_after_missing_runs, result=result)
@@ -149,6 +161,20 @@ class LifecycleEngine:
                 or result.closed or result.reopened):
             result.events = self.store.list_events(run_id=run_id, limit=10000)
         return result
+
+    def _requirement_change(self, conn: Any, result: LifecycleResult, uid: str,
+                            run_id: str, row: dict[str, Any],
+                            observation: JobObservation, now: str) -> None:
+        old_text = row.get("description") or ""
+        new_text = observation.description or ""
+        if old_text == new_text:
+            return
+        rows = evidence_rows(job_uid=uid, old_run_id=row["last_seen_run_id"], run_id=run_id,
+                             old_text=old_text, new_text=new_text, rules=self.rules, now=now)
+        record_evidence(conn, rows)
+        result.requirement_text_revisions += 1
+        if json.loads(rows[-1]["evidence_json"])["status"] == "eligibility_changed":
+            result.requirement_impact_changes += 1
 
     def _snapshot(self, conn: Any, uid: str, run_id: str, digest: str,
                   payload_json: str, now: str) -> None:

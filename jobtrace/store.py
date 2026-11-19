@@ -213,6 +213,33 @@ class Store:
         row = self.conn.execute(sql, params).fetchone()
         return row[0] if row else None
 
+    def list_requirement_evidence(self, *, job_uid: str | None = None,
+                                  run_id: str | None = None,
+                                  rules_version: str | None = None,
+                                  contract: str | None = None,
+                                  limit: int = 1000) -> list[dict[str, Any]]:
+        clauses, params = [], []
+        for column, value in (("job_uid", job_uid), ("run_id", run_id),
+                              ("rules_version", rules_version), ("contract", contract)):
+            if value:
+                clauses.append(f"{column} = ?")
+                params.append(value)
+        sql = "SELECT * FROM requirement_evidence"
+        if clauses:
+            sql += " WHERE " + " AND ".join(clauses)
+        rows = self.conn.execute(
+            sql + " ORDER BY job_uid, run_id, contract LIMIT ?", (*params, limit))
+        return [dict(row) for row in rows]
+
+    def requirements_rules_version(self) -> str | None:
+        return self.scalar("SELECT value FROM meta WHERE key = 'requirements_rules_version'")
+
+    def has_table(self, name: str) -> bool:
+        row = self.conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (name,)
+        ).fetchone()
+        return row is not None
+
     def notes(self, run: dict[str, Any]) -> dict[str, Any]:
         try:
             value = json.loads(run.get("notes_json") or "{}")

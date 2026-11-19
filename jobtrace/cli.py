@@ -13,6 +13,7 @@ from .commands import (
     command_demo,
     command_lint_size,
     command_report,
+    command_requirements,
     command_serve_mock,
     command_serve_review,
 )
@@ -78,6 +79,14 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("--site", help="site key to report")
     report.add_argument("--clock", help="fixed ISO-8601 clock, or 'system'")
 
+    requirements = commands.add_parser(
+        "requirements", help="read-only requirement-impact evidence projection")
+    _config_options(requirements)
+    requirements.add_argument("--db", help="SQLite database path override")
+    requirements.add_argument("--site", help="site key to query")
+    requirements.add_argument("--job", help="external job id to query")
+    requirements.add_argument("--rules-version", help="filter by rules table version")
+
     serve_mock = commands.add_parser("serve-mock", help="serve the synthetic site")
     serve_mock.add_argument("--scenario", default=os.environ.get("JOBTRACE_SCENARIO", "baseline"))
     serve_mock.add_argument("--port", type=int, default=_env_int("JOBTRACE_MOCK_PORT", 8765))
@@ -100,6 +109,7 @@ def main(argv: list[str] | None = None) -> int:
     handlers: dict[str, Callable[[argparse.Namespace], int]] = {
         "demo": command_demo, "collect": command_collect, "report": command_report,
         "serve-mock": command_serve_mock, "serve-review": command_serve_review,
+        "requirements": command_requirements,
         "lint-size": command_lint_size,
     }
     try:

@@ -10,9 +10,13 @@ from bs4 import BeautifulSoup, Tag
 
 from .models import JobObservation, ListItem
 from .normalize import (
-    clean_text, normalize_employment_type, normalize_experience,
-    normalize_location, normalize_tags,
+    clean_text,
+    normalize_employment_type,
+    normalize_experience,
+    normalize_location,
+    normalize_tags,
 )
+from .requirements import DEFAULT_RULES, parse_requirements
 from .salary import parse_salary
 from .selectors import Selectors
 
@@ -120,7 +124,8 @@ def _optional(soup: BeautifulSoup, selector: str, key: str,
 
 
 def parse_detail_page(html: str, page_url: str, site_key: str,
-                      item: ListItem, selectors: Selectors) -> DetailResult:
+                      item: ListItem, selectors: Selectors,
+                      rules=DEFAULT_RULES) -> DetailResult:
     soup = BeautifulSoup(html, "html.parser")
     misses: dict[str, int] = {}
     issues: list[str] = []
@@ -158,7 +163,7 @@ def parse_detail_page(html: str, page_url: str, site_key: str,
         description=description,
         tags=normalize_tags([node.get_text(" ", strip=True) for node in tag_nodes]),
         detail_url=page_url, posted_at=posted_at or None, source_status=status or None,
-        issues=tuple(issues),
+        issues=tuple(issues), requirement=parse_requirements(description, rules),
     )
     return DetailResult(observation=observation, issues=tuple(issues), selector_misses=misses)
 
